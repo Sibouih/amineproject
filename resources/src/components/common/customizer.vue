@@ -54,80 +54,9 @@
                 <span class="title-lang">French</span>
               </a>
               <a @click="SetLocal('ar')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-sa"></i>
+                <i title="sa" class="flag-icon flag-icon-squared flag-icon-ma"></i>
                 <span class="title-lang">Arabic</span>
               </a>
-              <a @click="SetLocal('tur')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-tr"></i>
-                <span class="title-lang">Turkish</span>
-              </a>
-
-              <a @click="SetLocal('sm_ch')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-cn"></i>
-                <span class="title-lang">Simplified Chinese</span>
-              </a>
-
-              <a @click="SetLocal('thai')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-th"></i>
-                <span class="title-lang">Thaï</span>
-              </a>
-
-              <a @click="SetLocal('hn')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-in"></i>
-                <span class="title-lang">Hindi</span>
-              </a>
-
-              <a @click="SetLocal('de')">
-                <i title="de" class="flag-icon flag-icon-squared flag-icon-de"></i>
-                <span class="title-lang">German</span>
-              </a>
-              <a @click="SetLocal('es')">
-                <i title="es" class="flag-icon flag-icon-squared flag-icon-es"></i>
-                <span class="title-lang">Spanish</span>
-              </a>
-              <a @click="SetLocal('it')">
-                <i title="it" class="flag-icon flag-icon-squared flag-icon-it"></i>
-                <span class="title-lang">Italien</span>
-              </a>
-              <a @click="SetLocal('Ind')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-id"></i>
-                <span class="title-lang">Indonesian</span>
-              </a>
-
-              <a @click="SetLocal('tr_ch')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-cn"></i>
-                <span class="title-lang">Traditional Chinese</span>
-              </a>
-
-              <a @click="SetLocal('ru')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-ru"></i>
-                <span class="title-lang">Russian</span>
-              </a>
-
-              <a @click="SetLocal('vn')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-vn"></i>
-                <span class="title-lang">Vietnamese</span>
-              </a>
-              <a @click="SetLocal('kr')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-kr"></i>
-                <span class="title-lang">Korean</span>
-              </a>
-           
-              <a @click="SetLocal('ba')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-bd"></i>
-                <span class="title-lang">Bangla</span>
-              </a>
-
-              <a @click="SetLocal('br')">
-                <i title="pt" class="flag-icon flag-icon-squared flag-icon-pt"></i>
-                <span class="title-lang">Portuguese</span>
-              </a>
-
-               <a @click="SetLocal('da')">
-                <i title="sa" class="flag-icon flag-icon-squared flag-icon-dk"></i>
-                <span class="title-lang">Danish</span>
-              </a>
-            
             </div>
           </div>
         </div>
@@ -146,22 +75,7 @@ export default {
        langs: [
         "en",
         "fr",
-        "ar",
-        "de",
-        "es",
-        "it",
-        "Ind",
-        "thai",
-        "tr_ch",
-        "sm_ch",
-        "tur",
-        "ru",
-        "hn",
-        "vn",
-        "kr",
-        "ba",
-        "br",
-        "da",
+        "ar"
       ],
       
     };

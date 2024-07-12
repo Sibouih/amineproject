@@ -4075,6 +4075,7 @@ class ReportController extends BaseController
             $item['warehouse_name'] = $detail['sale']['warehouse']->name;
             $item['unit_sale'] = $unit?$unit->ShortName:'';
             $item['quantity'] = $detail->quantity .' '.$item['unit_sale'];
+            $item['price'] = $detail->price;
             $item['total'] = $detail->total;
             $item['product_name'] = $product_name;
 
@@ -4097,6 +4098,174 @@ class ReportController extends BaseController
             'totalRows' => $totalRows,
             'sales' => $data,
             'customers' => $customers,
+            'warehouses' => $warehouses,
+            'users' => $users,
+        ]);
+
+    }
+
+    //-------------------- sale product details -------------\\
+
+    public function purchase_products_details(request $request)
+    {
+
+        $this->authorizeForUser($request->user('api'), 'product_report', Product::class);
+        // How many items do you want to display.
+        $perPage = $request->limit;
+        $pageStart = \Request::get('page', 1);
+        // Start displaying items from this number;
+        $offSet = ($pageStart * $perPage) - $perPage;
+
+        $Role = Auth::user()->roles()->first();
+        $ShowRecord = Role::findOrFail($Role->id)->inRole('record_view');
+
+        $purchase_details_data = PurchaseDetail::with('product','purchase','purchase.provider','purchase.warehouse','purchase.user')
+            ->where(function ($query) use ($ShowRecord) {
+                if (!$ShowRecord) {
+                    return $query->whereHas('purchase', function ($q) use ($request) {
+                        $q->where('user_id', '=', Auth::user()->id);
+                    });
+                }
+            })
+            ->whereBetween('date', array($request->from, $request->to))
+            ->where('product_id', $request->id)
+
+             //Filters
+             ->where(function ($query) use ($request) {
+                return $query->when($request->filled('Ref'), function ($query) use ($request) {
+                    return $query->where(function ($query) use ($request) {
+                        return $query->whereHas('purchase', function ($q) use ($request) {
+                            $q->where('Ref', 'LIKE', "{$request->Ref}");
+                        });
+                    });
+                });
+            })
+
+            ->where(function ($query) use ($request) {
+                return $query->when($request->filled('provider_id'), function ($query) use ($request) {
+                    return $query->where(function ($query) use ($request) {
+                        return $query->whereHas('purchase.provider', function ($q) use ($request) {
+                            $q->where('provider_id', $request->provider_id);
+                        });
+                    });
+                });
+            })
+
+            ->where(function ($query) use ($request) {
+                return $query->when($request->filled('warehouse_id'), function ($query) use ($request) {
+                    return $query->where(function ($query) use ($request) {
+                        return $query->whereHas('purchase.warehouse', function ($q) use ($request) {
+                            $q->where('warehouse_id', $request->warehouse_id);
+                        });
+                    });
+                });
+            })
+
+            ->where(function ($query) use ($request) {
+                return $query->when($request->filled('user_id'), function ($query) use ($request) {
+                    return $query->where(function ($query) use ($request) {
+                        return $query->whereHas('purchase.user', function ($q) use ($request) {
+                            $q->where('user_id', $request->user_id);
+                        });
+                    });
+                });
+            })
+
+            //search
+             ->where(function ($query) use ($request) {
+                return $query->when($request->filled('search'), function ($query) use ($request) {
+                    return $query->where(function ($query) use ($request) {
+                            return $query->whereHas('purchase.provider', function ($q) use ($request) {
+                                $q->where('name', 'LIKE', "%{$request->search}%");
+                            });
+                        })
+                        ->orWhere(function ($query) use ($request) {
+                            return $query->whereHas('purchase.warehouse', function ($q) use ($request) {
+                                $q->where('name', 'LIKE', "%{$request->search}%");
+                            });
+                        })
+                        ->orWhere(function ($query) use ($request) {
+                            return $query->whereHas('purchase', function ($q) use ($request) {
+                                $q->where('Ref', 'LIKE', "%{$request->search}%");
+                            });
+                        })
+                        ->orWhere(function ($query) use ($request) {
+                            return $query->whereHas('product', function ($q) use ($request) {
+                                $q->where('name', 'LIKE', "%{$request->search}%");
+                            });
+                        });
+                });
+            });
+
+        $totalRows = $purchase_details_data->count();
+        if($perPage == "-1"){
+            $perPage = $totalRows;
+        }
+        $purchase_details = $purchase_details_data->offset($offSet)
+            ->limit($perPage)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $data = [];
+        foreach ($purchase_details as $detail) {
+
+            //check if detail has purchase_unit_id Or Null
+            if($detail->purchase_unit_id !== null){
+                $unit = Unit::where('id', $detail->purchase_unit_id)->first();
+            }else{
+                $product_unit_purchase_id = Product::with('unitPurchase')
+                ->where('id', $detail->product_id)
+                ->first();
+
+                if($product_unit_purchase_id['unitPurchase']){
+                    $unit = Unit::where('id', $product_unit_purchase_id['unitPurchase']->id)->first();
+                }{
+                    $unit = NULL;
+                }
+            }
+
+
+            if($detail->product_variant_id){
+                $productsVariants = ProductVariant::where('product_id', $detail->product_id)
+                ->where('id', $detail->product_variant_id)->first();
+
+                $product_name = '['.$productsVariants->name . ']' . $detail['product']['name'];
+
+            }else{
+                $product_name = $detail['product']['name'];
+            }
+
+            $item['date'] = $detail->date;
+            $item['Ref'] = $detail['purchase']->Ref;
+            $item['created_by'] = $detail['purchase']['user']->username;
+            $item['purchase_id'] = $detail['purchase']->id;
+            $item['provider_name'] = $detail['purchase']['provider']->name;
+            $item['warehouse_name'] = $detail['purchase']['warehouse']->name;
+            $item['unit_purchase'] = $unit?$unit->ShortName:'';
+            $item['quantity'] = $detail->quantity .' '.$item['unit_purchase'];
+            $item['price'] = $detail->price;
+            $item['total'] = $detail->total;
+            $item['product_name'] = $product_name;
+
+            $data[] = $item;
+        }
+
+        $providers = provider::where('deleted_at', '=', null)->get(['id', 'name']);
+        $users = User::get(['id', 'username']);
+
+        //get warehouses assigned to user
+        $user_auth = auth()->user();
+        if($user_auth->is_all_warehouses){
+            $warehouses = Warehouse::where('deleted_at', '=', null)->get(['id', 'name']);
+        }else{
+            $warehouses_id = UserWarehouse::where('user_id', $user_auth->id)->pluck('warehouse_id')->toArray();
+            $warehouses = Warehouse::where('deleted_at', '=', null)->whereIn('id', $warehouses_id)->get(['id', 'name']);
+        }
+
+        return response()->json([
+            'totalRows' => $totalRows,
+            'purchases' => $data,
+            'providers' => $providers,
             'warehouses' => $warehouses,
             'users' => $users,
         ]);

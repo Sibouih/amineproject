@@ -94,7 +94,6 @@ class ProductsController extends BaseController
                 $item['cost']  = number_format($product->cost, 2, '.', ',');
                 $item['price'] = number_format($product->price, 2, '.', ',');
                 $item['benefice'] = number_format($product->price - $product->cost, 2, '.', ',');
-            
               $product_warehouse_total_qty = product_warehouse::where('product_id', $product->id)
               ->where('deleted_at', '=', null)
               ->where(function ($query) use ($request) {
@@ -103,7 +102,6 @@ class ProductsController extends BaseController
                       });
                   })
               ->sum('qte');
-
               $item['quantity'] = $product_warehouse_total_qty .' '.$product['unit']->ShortName;
               $item['total_cost'] = $product->cost * $product_warehouse_total_qty;
               $item['total_amount'] = $product->price * $product_warehouse_total_qty;

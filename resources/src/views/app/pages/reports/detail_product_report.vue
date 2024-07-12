@@ -45,65 +45,119 @@
            
 
             <!-- Sales Table -->
-            <b-tab :title="$t('Sales')">
-              <vue-good-table
-                mode="remote"
-                :columns="columns_sales"
-                :totalRows="totalRows_sales"
-                :rows="sales"
-                @on-page-change="PageChangeSales"
-                @on-per-page-change="onPerPageChangeSales"
-                @on-search="onSearch_sales"
-                :search-options="{
-                  placeholder: $t('Search_this_table'),
-                  enabled: true,
-                }"
-                :pagination-options="{
-                  enabled: true,
-                  mode: 'records',
-                  nextLabel: 'next',
-                  prevLabel: 'prev',
-                }"
-                styleClass="tableOne table-hover vgt-table"
-              >
-              <div slot="table-actions" class="mt-2 mb-3">
-                 <b-button variant="outline-info ripple m-1" size="sm" v-b-toggle.sidebar-right>
-                  <i class="i-Filter-2"></i>
-                  {{ $t("Filter") }}
-                </b-button>
-
-                <b-button @click="Sales_PDF()" size="sm" variant="outline-success ripple m-1">
-                  <i class="i-File-Copy"></i> PDF
-                </b-button>
-
-                 <vue-excel-xlsx
-                    class="btn btn-sm btn-outline-danger ripple m-1"
-                    :data="sales"
-                    :columns="columns_sales"
-                    :file-name="'product_report'"
-                    :file-type="'xlsx'"
-                    :sheet-name="'product_report'"
+            <b-row v-if="!isLoading">
+              <b-col md="12">
+                <b-tab :title="$t('Sales')">
+                    <vue-good-table
+                      mode="remote"
+                      :columns="columns_sales"
+                      :totalRows="totalRows_sales"
+                      :rows="sales"                      
+                      @on-page-change="PageChangeSales"
+                      @on-per-page-change="onPerPageChangeSales"
+                      @on-search="onSearch_sales"
+                      :search-options="{
+                        placeholder: $t('Search_this_table'),
+                        enabled: true,
+                      }"
+                      :pagination-options="{
+                        enabled: true,
+                        mode: 'records',
+                        nextLabel: 'next',
+                        prevLabel: 'prev',
+                      }"
+                      styleClass="tableOne table-hover vgt-table"
                     >
-                    <i class="i-File-Excel"></i> EXCEL
-                </vue-excel-xlsx>
+                    <div slot="table-actions" class="mt-2 mb-3">
+                      <b-button variant="outline-info ripple m-1" size="sm" v-b-toggle.sidebar-right>
+                        <i class="i-Filter-2"></i>
+                        {{ $t("Filter") }}
+                      </b-button>
 
-              </div>
-                <template slot="table-row" slot-scope="props">
-                  <div v-if="props.column.field == 'Ref'">
-                    <router-link
-                      :to="'/app/sales/detail/'+props.row.sale_id"
-                    >
-                      <span class="ul-btn__text ml-1">{{props.row.Ref}}</span>
-                    </router-link>
+                      <b-button @click="Sales_PDF()" size="sm" variant="outline-success ripple m-1">
+                        <i class="i-File-Copy"></i> PDF
+                      </b-button>
+
+                      <vue-excel-xlsx
+                          class="btn btn-sm btn-outline-danger ripple m-1"
+                          :data="sales"
+                          :columns="columns_sales"
+                          :file-name="'product_report'"
+                          :file-type="'xlsx'"
+                          :sheet-name="'product_report'"
+                          >
+                          <i class="i-File-Excel"></i> EXCEL
+                      </vue-excel-xlsx>
+
+                    </div>
+                      <template slot="table-row" slot-scope="props">
+                        <div v-if="props.column.field == 'Ref'">
+                          <router-link
+                            :to="'/app/sales/detail/'+props.row.sale_id"
+                          >
+                            <span class="ul-btn__text ml-1">{{props.row.Ref}}</span>
+                          </router-link>
+                        </div>
+
+                        <div v-else-if="props.column.field == 'total'">
+                          <span>{{currentUser.currency}} {{props.row.total}}</span>
+                        </div>
+
+                      </template>
+                    </vue-good-table>
+                </b-tab>
+              </b-col>
+            </b-row>
+
+            <!-- Purchase Table -->
+            <b-row v-if="!isLoading">
+              <b-col md="12">                
+                <b-tab :title="$t('Purchases')">
+                  <vue-good-table
+                    mode="remote"
+                    :columns="columns_purchases"
+                    :totalRows="totalRows_purchases"
+                    :rows="purchases"                  
+                    @on-page-change="PageChangePurchases"
+                    @on-per-page-change="onPerPageChangePurchases"
+                    @on-search="onSearch_purchases"
+                    :search-options="{
+                      placeholder: $t('Search_this_table'),
+                      enabled: true,
+                    }"
+                    :pagination-options="{
+                      enabled: true,
+                      mode: 'records',
+                      nextLabel: 'next',
+                      prevLabel: 'prev',
+                    }"
+                    styleClass="tableOne table-hover vgt-table"
+                  >
+                  <div slot="table-actions" class="mt-2 mb-3">
+                    <b-button variant="outline-info ripple m-1" size="sm" v-b-toggle.sidebar-right>
+                      <i class="i-Filter-2"></i>
+                      {{ $t("Filter") }}
+                    </b-button>
+
                   </div>
+                    <template slot="table-row" slot-scope="props">
+                      <div v-if="props.column.field == 'Ref'">
+                        <router-link
+                          :to="'/app/purchases/detail/'+props.row.purchase_id"
+                        >
+                          <span class="ul-btn__text ml-1">{{props.row.Ref}}</span>
+                        </router-link>
+                      </div>
 
-                  <div v-else-if="props.column.field == 'total'">
-                    <span>{{currentUser.currency}} {{props.row.total}}</span>
-                  </div>
+                      <div v-else-if="props.column.field == 'total'">
+                        <span>{{currentUser.currency}} {{props.row.total}}</span>
+                      </div>
 
-                </template>
-              </vue-good-table>
-            </b-tab>
+                    </template>
+                  </vue-good-table>
+                </b-tab>                
+              </b-col>
+            </b-row>
 
           </b-tabs>
         </b-card>
@@ -202,11 +256,16 @@ export default {
   data() {
     return {
       totalRows_sales: "",
+      totalRows_purchases: "",
       limit_sales: "10",
+      limit_purchases: "10",
       sales_page: 1,
+      purchases_page: 1,
       search_sales:"",
+      search_purchases:"",
 
       Filter_Client: "",
+      Filter_Provider: "",
       Filter_Ref: "",
       Filter_warehouse: "",
       Filter_user: "",
@@ -218,6 +277,9 @@ export default {
       customers: [],
       users: [],
       product:{},
+      rows: [{
+        children: [],
+      },],
       today_mode: true,
       startDate: "", 
       endDate: "", 
@@ -288,6 +350,14 @@ export default {
         {
           label: this.$t("Quantity"),
           field: "quantity",
+          headerField: this.sumTotalQte,
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Price"),
+          field: "price",
           tdClass: "text-left",
           thClass: "text-left",
           sortable: false
@@ -295,6 +365,7 @@ export default {
         {
           label: this.$t("SubTotal"),
           field: "total",
+          headerField: this.sumTotalAmount,
           tdClass: "text-left",
           thClass: "text-left",
           sortable: false
@@ -302,7 +373,75 @@ export default {
         
       ];
     },
-    
+
+    columns_purchases() {
+      return [
+        {
+          label: this.$t("date"),
+          field: "date",
+          tdClass: "text-left",
+          thClass: "text-left"
+        },
+        {
+          label: this.$t("Reference"),
+          field: "Ref",
+          tdClass: "text-left",
+          thClass: "text-left"
+        },
+         {
+          label: this.$t("Created_by"),
+          field: "created_by",
+          tdClass: "text-left",
+          thClass: "text-left",
+           sortable: false
+        },
+        {
+          label: this.$t("product_name"),
+          field: "product_name",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Provider"),
+          field: "provider_name",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("warehouse"),
+          field: "warehouse_name",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Quantity"),
+          field: "quantity",
+          headerField: this.sumTotalQte,
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Price"),
+          field: "price",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("SubTotal"),
+          field: "total",
+          headerField: this.sumTotalAmount,
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        
+      ];
+    },
   },
 
   methods: {
@@ -311,6 +450,7 @@ export default {
     Reset_Filter() {
       this.search = "";
       this.Filter_Client = "";
+      this.Filter_Provider = "";
       this.Filter_Ref = "";
       this.Filter_warehouse = "";
       this.Filter_user = "";
@@ -330,6 +470,8 @@ export default {
         { title: "Client", dataKey: "client_name" },
         { title: "Warehouse", dataKey: "warehouse_name" },
         { title: "Quantity", dataKey: "quantity" },
+        { title: "Cost", dataKey: "cost" },
+        { title: "Price", dataKey: "price" },
         { title: "SubTotal", dataKey: "total" },
       ];
       pdf.autoTable(columns, self.sales);
@@ -359,6 +501,14 @@ export default {
       }
     },
 
+    //--------------------------- Event Page Change -------------\\
+    PageChangePurchases({ currentPage }) {
+      console.log('tess');
+      if (this.purchases_page !== currentPage) {
+        this.Get_Purchases(currentPage);
+      }
+    },
+
     //--------------------------- Limit Page Sales -------------\\
     onPerPageChangeSales({ currentPerPage }) {
       if (this.limit_sales !== currentPerPage) {
@@ -367,12 +517,64 @@ export default {
       }
     },
 
+    onPerPageChangePurchases({ currentPerPage }) {
+      console.log('hola');
+      if (this.limit_purchases !== currentPerPage) {
+        this.limit_purchases = currentPerPage;
+        this.Get_Purchases(1);
+      }
+    },
+
     onSearch_sales(value) {
       this.search_sales = value.searchTerm;
       this.Get_Sales(1);
     },
 
-     
+    onSearch_purchases(value) {
+      this.search_purchases = value.searchTerm;
+      this.Get_Purchases(1);
+    },
+
+    sumTotalQte(rowObj) {
+      if (!rowObj || !rowObj.children || !Array.isArray(rowObj.children)) {
+        console.error('Invalid input for Total Amount');
+        return 0;
+      }
+      let sum = 0;
+      for (let i = 0; i < rowObj.children.length; i++) {
+        let qty = parseFloat(rowObj.children[i].quantity.split(" ")[0]);
+        sum += qty;
+      }
+      return sum.toString() + " pc";
+    },
+
+    sumTotalCosts(rowObj) {
+      if (!rowObj || !rowObj.children || !Array.isArray(rowObj.children)) {
+        console.error('Invalid input for Cost Amount');
+        return 0;
+      }
+      let sum = 0;
+      for (let i = 0; i < rowObj.children.length; i++) {
+        console.log('rowObj.children[i].cost', rowObj.children[i])
+        let cost = parseFloat(rowObj.children[i].cost);
+        sum += cost;
+      }
+      return sum.toString() + " pc";
+    },
+
+    sumTotalAmount(rowObj) {
+      if (!rowObj || !rowObj.children || !Array.isArray(rowObj.children)) {
+        console.error('Invalid input for Total Amount');
+        return 0;
+      }
+      let sum_amount = 0;
+
+      for (let i = 0; i < rowObj.children.length; i++) {
+        sum_amount += rowObj.children[i].total;
+      }
+      return sum_amount + ' dh';
+    },
+
     //----------------------------- Submit Date Picker -------------------\\
     Submit_filter_dateRange() {
       var self = this;
@@ -442,6 +644,7 @@ export default {
         )
         .then(response => {
           this.sales = response.data.sales;
+          //this.rows[0].children = this.sales;
           this.totalRows_sales = response.data.totalRows;
           this.customers = response.data.customers;
           this.warehouses = response.data.warehouses;
@@ -460,6 +663,59 @@ export default {
         });
     },
 
+    //--------------------------- sale_products_details -------------\\
+    Get_Purchases(page) {
+      // Start the progress bar.
+      NProgress.start();
+      NProgress.set(0.1);
+      this.get_data_loaded();
+      console.log('test')
+      axios
+        .get(
+          "/report/purchase_products_details?page=" +
+            page +
+            "&Ref=" +
+            this.Filter_Ref +
+            "&provider_id=" +
+            this.Filter_Provider +
+            "&warehouse_id=" +
+            this.Filter_warehouse +
+            "&user_id=" +
+            this.Filter_user +
+            "&limit=" +
+            this.limit_purchases +
+            "&to=" +
+            this.endDate +
+            "&from=" +
+            this.startDate +
+            "&search=" +
+            this.search_purchases +
+            "&id=" +
+            this.$route.params.id
+        )
+        .then(response => {
+          this.purchases = response.data.purchases;
+          //this.rows[0].children = this.purchases;
+          this.totalRows_purchases = response.data.totalRows;
+          this.providers = response.data.providers;
+          console.log('this.providers', this.providers)
+          this.warehouses = response.data.warehouses;
+          this.users = response.data.users;
+
+          NProgress.done();
+          this.isLoading = false;
+          this.today_mode = false;
+        })
+        .catch(response => {
+           NProgress.done();
+          setTimeout(() => {
+            this.isLoading = false;
+            this.today_mode = false;
+          }, 500);
+        });
+    },
+    
+
   
   }, //end Methods
 
@@ -468,6 +724,7 @@ export default {
   created: function() {
     this.showDetails();
     this.Get_Sales(1);
+    this.Get_Purchases(1)
   }
 };
 </script>

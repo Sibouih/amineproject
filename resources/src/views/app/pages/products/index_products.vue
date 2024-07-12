@@ -9,9 +9,9 @@
         :totalRows="totalRows"
         :rows="rows"
         :group-options="{
-        enabled: true,
-        headerPosition: 'bottom',
-      }"
+          enabled: true,
+          headerPosition: 'bottom',
+        }"
         @on-page-change="onPageChange"
         @on-per-page-change="onPerPageChange"
         @on-sort-change="onSortChange"

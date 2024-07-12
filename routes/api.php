@@ -73,6 +73,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get("report/top_customers", "ReportController@report_top_customers");
     Route::get("report/product_report", "ReportController@product_report");
     Route::get("report/sale_products_details", "ReportController@sale_products_details");
+    Route::get("report/purchase_products_details", "ReportController@purchase_products_details");
     Route::get("report/product_sales_report", "ReportController@product_sales_report");
     Route::get("report/product_purchases_report", "ReportController@product_purchases_report");
 

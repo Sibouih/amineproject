@@ -134,9 +134,6 @@
                                 </b-input-group-prepend>
                                 <input
                                   class="form-control"
-                                  @keyup="Verified_Qty(detail,detail.detail_id)"
-                                  :min="0.00"
-                                  :max="detail.stock"
                                   v-model.number="detail.quantity"
                                 >
                                 <b-input-group-append>
@@ -744,12 +741,6 @@ export default {
                 }
               }
             }
-
-            if (this.details[i].stock < this.details[i].quantity) {
-              this.details[i].quantity = this.details[i].stock;
-            } else {
-              this.details[i].quantity =1;
-            }
                       
           this.details[i].Unit_price = this.detail.Unit_price;
           this.details[i].tax_percent = this.detail.tax_percent;
@@ -820,18 +811,16 @@ export default {
 
        if (this.search_input.length < 2) {
 
-        return this.product_filter= [];
+        return this.product_filter = [];
       }
-      console.log('this.sale_return.warehouse_id', this.sale_return.warehouse_id);
       
       if (this.sale_return.warehouse_id != "" &&  this.sale_return.warehouse_id != null) {
         this.timer = setTimeout(() => {
           const product_filter = this.products.filter(product => product.code === this.search_input || product.barcode.includes(this.search_input));
-          console.log('product_filter', product_filter);
             if(product_filter.length === 1){
                 this.SearchProduct(product_filter[0])
             }else{
-                this.product_filter=  this.products.filter(product => {
+                this.product_filter = this.products.filter(product => {
                   return (
                     product.name.toLowerCase().includes(this.search_input.toLowerCase()) ||
                     product.code.toLowerCase().includes(this.search_input.toLowerCase()) ||
@@ -860,7 +849,6 @@ export default {
 
     SearchProduct(result) {
       this.product = {};
-      console.log('result', result);
       
       if( result.product_type =='is_service'){
         this.product.quantity = 1;
@@ -901,9 +889,11 @@ export default {
         NProgress.start();
         NProgress.set(0.1);
       axios
-        .get("get_Products_by_warehouse/" + id + "?stock=" + 1 + "&is_sale=" + 1 + "&product_service=" + 1)
+        .get("get_Products_by_warehouse/" + id + "?stock=" + 0 + "&is_sale=" + 1 + "&product_service=" + 1)
          .then(response => {
             this.products = response.data;
+            console.log('productsss', this.products)
+
              NProgress.done();
 
             })
@@ -935,36 +925,12 @@ export default {
       });
     },
 
-    //-----------------------------------Verified QTY ------------------------------\\
-    Verified_Qty(detail, id) {
-      for (var i = 0; i < this.details.length; i++) {
-        if (this.details[i].detail_id === id) {
-          if (isNaN(detail.quantity)) {
-            this.details[i].quantity = detail.stock;
-          }
-
-          if (detail.quantity > detail.stock) {
-            this.makeToast("warning", this.$t("LowStock"), this.$t("Warning"));
-            this.details[i].quantity = detail.stock;
-          } else {
-            this.details[i].quantity = detail.quantity;
-          }
-        }
-      }
-      this.$forceUpdate();
-      this.Calcul_Total();
-    },
-
     //-----------------------------------increment QTY ------------------------------\\
 
     increment(detail, id) {
       for (var i = 0; i < this.details.length; i++) {
         if (this.details[i].detail_id == id) {
-          if (detail.quantity + 1 > detail.stock) {
-            this.makeToast("warning", this.$t("LowStock"), this.$t("Warning"));
-          } else {
-            this.formatNumber(this.details[i].quantity++, 2);
-          }
+          this.formatNumber(this.details[i].quantity++, 2);
         }
       }
       this.$forceUpdate();
@@ -977,15 +943,7 @@ export default {
       for (var i = 0; i < this.details.length; i++) {
         if (this.details[i].detail_id == id) {
           if (detail.quantity - 1 > 0) {
-            if (detail.quantity - 1 > detail.stock) {
-              this.makeToast(
-                "warning",
-                this.$t("LowStock"),
-                this.$t("Warning")
-              );
-            } else {
-              this.formatNumber(this.details[i].quantity--, 2);
-            }
+            this.formatNumber(this.details[i].quantity--, 2);
           }
         }
       }
@@ -1060,14 +1018,9 @@ export default {
         for (var i = 0; i < this.details.length; i++) {
           if (
             this.details[i].quantity == "" ||
-            this.details[i].quantity === 0 ||
-            this.details[i].quantity > this.details[i].stock
+            this.details[i].quantity === 0
           ) {
             count += 1;
-            if(this.details[i].quantity > this.details[i].stock){
-              this.makeToast("warning", this.$t("LowStock"), this.$t("Warning"));
-              return false;
-            }
           }
         }
 

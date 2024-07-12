@@ -1057,8 +1057,6 @@ export default {
 
             if (this.details[i].stock < this.details[i].quantity) {
               this.details[i].quantity = this.details[i].stock;
-            } else {
-              this.details[i].quantity =1;
             }
                       
           this.details[i].Unit_price = this.detail.Unit_price;
