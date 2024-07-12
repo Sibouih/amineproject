@@ -1,0 +1,72 @@
+name: Laravel CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  laravel-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup PHP
+      uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
+      with:
+        php-version: '8.0'
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+    - name: Install Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+    - name: Directory Permissions
+      run: chmod -R 777 storage bootstrap/cache
+
+  deploy:
+  needs: laravel-tests
+  if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  runs-on: ubuntu-latest
+  steps:
+  - uses: actions/checkout@v4
+  - name: Setup PHP
+    uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
+    with:
+      php-version: '8.0'
+  - name: Install Dependencies
+    run: composer install --no-dev --prefer-dist --no-progress
+  - name: Setup Node.js
+    uses: actions/setup-node@v3
+    with:
+      node-version: '16'
+  - name: Install NPM dependencies
+    run: npm ci
+  - name: Build Vue.js assets
+    run: npm run production
+  
+  - name: Get current date
+    id: date
+    run: echo "::set-output name=date::$(date +'%Y-%m-%d-%H-%M-%S')"
+  
+  - name: Deploy to Namecheap
+    uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+    with:
+      server: ${{ secrets.FTP_SERVER }}
+      username: ${{ secrets.FTP_USERNAME }}
+      password: ${{ secrets.FTP_PASSWORD }}
+      server-dir: /home/lachmavr/releases/${{ steps.date.outputs.date }}/
+      exclude: |
+        **/.git*
+        **/.git*/**
+        **/node_modules/**
+
+  - name: Update symlink
+    uses: appleboy/ssh-action@master
+    with:
+      host: ${{ secrets.FTP_SERVER }}
+      username: ${{ secrets.SSH_USERNAME }}
+      password: ${{ secrets.SSH_PASSWORD }}
+      script: |
+        ln -sfn /home/lachmavr/releases/${{ steps.date.outputs.date }} /home/lachmavr/public_html
+        
+        # Optional: Keep only the last 5 releases
+        cd /home/lachmavr/releases && ls -t | tail -n +6 | xargs rm -rf
