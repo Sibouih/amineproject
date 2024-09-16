@@ -510,3 +510,6 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
 
 
     // Route::get('/available-modules', 'ModuleSettingsController@get_modules_enabled');
+
+
+    Route::get('clients_export_all', 'ClientController@exportAllClients');

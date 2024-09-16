@@ -289,120 +289,88 @@ class ProvidersController extends BaseController
     //------------- pay_supplier_due -------------\\
 
     public function pay_supplier_due(Request $request)
-    {
-        $this->authorizeForUser($request->user('api'), 'pay_supplier_due', Provider::class);
+     {
+         $this->authorizeForUser($request->user('api'), 'pay_supplier_due', Provider::class);
+        
+         if($request['amount'] > 0){
+            $provider_purchases_due = Purchase::where('deleted_at', '=', null)
+            ->where([
+                ['payment_statut', '!=', 'paid'],
+                ['provider_id', $request->provider_id]
+            ])->get();
 
-        $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-            'provider_id' => 'required|exists:providers,id',
-            'account_id' => 'nullable|exists:accounts,id',
-            'Reglement' => 'required|string',
-            'notes' => 'nullable|string',
-            'type' => 'required|string|in:credit_initial_only,credit_initial_first,credit_achats_only,credit_achats_first',
-        ]);
-
-        if ($request['amount'] <= 0) {
-            return response()->json(['success' => false, 'message' => 'Amount must be greater than zero.'], 400);
-        }
-
-        try {
-            $provider_purchases_due = Purchase::whereNull('deleted_at')
-                ->where('statut', 'received')
-                ->where('payment_statut', '!=', 'paid')
-                ->where('provider_id', $request->provider_id)
-                ->get();
-
-            $provider = Provider::whereNull('deleted_at')->where('id', $request->provider_id)->first();
+            $provider = Provider::where('deleted_at', '=', null)->where('id', '=', $request->provider_id)->first();
 
             $paid_amount_total = $request->amount;
-
-            // Handle credit_initial payments
             if ($request->type == 'credit_initial_only' || $request->type == 'credit_initial_first') {
                 $paid_aux = $request->amount;
                 if ($paid_amount_total > $provider->credit_initial) {
-                    $paid_amount_total -= $provider->credit_initial;
+                    $paid_amount_total = $paid_amount_total - $provider->credit_initial;
                     $paid_aux = $provider->credit_initial;
                     $provider->credit_initial = 0;
-                } else {
-                    $provider->credit_initial -= $paid_amount_total;
-                    $paid_aux = $paid_amount_total;
-                    $paid_amount_total = 0;
+                }
+                else {
+                    $provider->credit_initial = $provider->credit_initial - $paid_amount_total;
                 }
                 $provider->save();
-                $this->createPayment($request, null, $paid_aux, null, 'credit_initial');
+                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
             }
 
-            // Handle credit_achats payments
             if ($request->type == 'credit_achats_only' || $request->type == 'credit_initial_first' || $request->type == 'credit_achats_first') {
-                foreach ($provider_purchases_due as $provider_purchase) {
-                    if ($paid_amount_total == 0) break;
+                foreach($provider_purchases_due as $key => $provider_purchase){
+                    if($paid_amount_total == 0)
+                    break;
+                    $due = $provider_purchase->GrandTotal  - $provider_purchase->paid_amount;
 
-                    $due = $provider_purchase->GrandTotal - $provider_purchase->paid_amount;
-
-                    if ($paid_amount_total >= $due) {
+                    if($paid_amount_total >= $due){
                         $amount = $due;
                         $payment_status = 'paid';
-                    } else {
+                    }else{
                         $amount = $paid_amount_total;
                         $payment_status = 'partial';
                     }
-
                     $this->createPayment($request, $provider_purchase, $amount, $payment_status);
                     $paid_amount_total -= $amount;
                 }
             }
 
-            // Handle remaining credit_initial payments for 'credit_achats_first'
             if ($paid_amount_total > 0 && $request->type == 'credit_achats_first') {
                 $paid_aux = $paid_amount_total;
                 if ($paid_amount_total > $provider->credit_initial) {
-                    $paid_amount_total -= $provider->credit_initial;
+                    $paid_amount_total = $paid_amount_total - $provider->credit_initial;
                     $paid_aux = $provider->credit_initial;
                     $provider->credit_initial = 0;
-                } else {
-                    $provider->credit_initial -= $paid_amount_total;
-                    $paid_aux = $paid_amount_total;
-                    $paid_amount_total = 0;
+                }
+                else {
+                    $provider->credit_initial = $provider->credit_initial - $paid_amount_total;
                 }
                 $provider->save();
-                $this->createPayment($request, null, $paid_aux, null, 'credit_initial');
+                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
             }
-
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            Log::error('Error processing supplier payment due: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'An error occurred while processing the payment: ' . $e->getMessage()], 500);
+            
         }
-    }
+         return response()->json(['success' => true]);
+ 
+     }
 
-    protected function createPayment($request, $provider_purchase = null, $amount, $payment_status, $type = 'purchase')
-    {
+     protected function createPayment($request, $provider_purchase = null, $amount, $payment_status, $type = 'purchase') {
         $payment_purchase = new PaymentPurchase();
-        if ($provider_purchase) {
+        if ($provider_purchase !== null) {
             $payment_purchase->purchase_id = $provider_purchase->id;
         }
         $payment_purchase->Ref = app('App\Http\Controllers\PaymentPurchasesController')->getNumberOrder();
         $payment_purchase->date = Carbon::now();
-        $payment_purchase->Reglement = $request->Reglement;
+        $payment_purchase->Reglement = $request['Reglement'];
         $payment_purchase->montant = $amount;
         $payment_purchase->change = 0;
-        $payment_purchase->notes = $request->notes;
-        $payment_purchase->user_id = Auth::id();
+        $payment_purchase->notes = $request['notes'];
+        $payment_purchase->user_id = Auth::user()->id;
         $payment_purchase->type_credit = $type;
         $payment_purchase->save();
-
-        if (isset($provider_purchase)) {
+        if ($provider_purchase !== null) {
             $provider_purchase->paid_amount += $amount;
             $provider_purchase->payment_statut = $payment_status;
             $provider_purchase->save();
-        }
-
-        if ($request['account_id']) {
-            $account = Account::find($request['account_id']);
-            if ($account) {
-                $account->balance -= $amount;
-                $account->save();
-            }
         }
     }
 

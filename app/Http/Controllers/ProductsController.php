@@ -25,6 +25,9 @@ use Illuminate\Validation\ValidationException;
 use \Gumlet\ImageResize;
 use App\Exports\StockExport;
 use Illuminate\Support\Facades\File;
+use App\Models\SaleDetail;
+use App\Models\PurchaseDetail;
+
 
 class ProductsController extends BaseController
 {
@@ -89,22 +92,30 @@ class ProductsController extends BaseController
 
 
             if($product->type == 'is_single'){
-
+                $product_warehouse_total_qty = product_warehouse::where('product_id', $product->id)
+                ->where('deleted_at', '=', null)
+                ->where(function ($query) use ($request) {
+                    return $query->when($request->filled('warehouse_id'), function ($query) use ($request) {
+                            return $query->where('warehouse_id', $request->warehouse_id);
+                        });
+                        
+                    })
+                ->sum('qte');
                 $item['name']  = $product->name;
-                $item['cost']  = number_format($product->cost, 2, '.', ',');
-                $item['price'] = number_format($product->price, 2, '.', ',');
-                $item['benefice'] = number_format($product->price - $product->cost, 2, '.', ',');
-              $product_warehouse_total_qty = product_warehouse::where('product_id', $product->id)
-              ->where('deleted_at', '=', null)
-              ->where(function ($query) use ($request) {
-                  return $query->when($request->filled('warehouse_id'), function ($query) use ($request) {
-                          return $query->where('warehouse_id', $request->warehouse_id);
-                      });
-                  })
-              ->sum('qte');
+                if ($request->filled('warehouse_id') && $product_warehouse_total_qty > 0) {
+                    $avgCost = $this->getAverageCost($product->id, $request->warehouse_id) ?? 0;
+                    $avgPrice = $this->getAveragePrice($product->id, $request->warehouse_id) ?? 0;
+                    $item['cost'] = $avgCost;
+                    $item['price'] = $avgPrice;
+                    $item['benefice'] = $avgPrice ? number_format($avgPrice - $avgCost, 2, '.', ',') : 0;
+                } else {                          
+                    $item['cost']  = $product->cost;
+                    $item['price'] = $product->price;
+                    $item['benefice'] = number_format($product->price - $product->cost, 2, '.', ',');
+                }
               $item['quantity'] = $product_warehouse_total_qty .' '.$product['unit']->ShortName;
-              $item['total_cost'] = $product->cost * $product_warehouse_total_qty;
-              $item['total_amount'] = $product->price * $product_warehouse_total_qty;
+              $item['total_cost'] = (float)$item['cost'] * $product_warehouse_total_qty;
+              $item['total_amount'] = (float)$item['price'] * $product_warehouse_total_qty;
               $item['total_profit'] = $item['benefice'] * $product_warehouse_total_qty;
 
             }elseif($product->type == 'is_variant'){
@@ -1953,6 +1964,23 @@ class ProductsController extends BaseController
  
     }
  
+    public function getAverageCost($productId, $warehouseId)
+    {
+        return PurchaseDetail::where('product_id', $productId)
+            ->whereHas('purchase', function ($query) use ($warehouseId) {
+                $query->where('warehouse_id', $warehouseId);
+            })
+            ->avg('cost') ?? 0;
+    }
+
+    public function getAveragePrice($productId, $warehouseId)
+    {
+        return SaleDetail::where('product_id', $productId)
+            ->whereHas('sale', function ($query) use ($warehouseId) {
+                $query->where('warehouse_id', $warehouseId);
+            })
+            ->avg('price') ?? 0;
+    }
 
 
 

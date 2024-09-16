@@ -107,7 +107,7 @@ class ClientController extends BaseController
             $item['city'] = $client->city;
             $item['remise'] = $client->remise;
             $item['credit_initial'] = $client->credit_initial ?? 0;
-            $item['total_credit'] = $client->credit_initial + $item['due'];
+            $item['total_credit'] = $client->credit_initial + $item['due'] - $item['return_Due'];
             $item['adresse'] = $client->adresse;
             $data[] = $item;
         }
@@ -329,120 +329,88 @@ class ClientController extends BaseController
     //------------- clients_pay_due -------------\\
 
     public function clients_pay_due(Request $request)
-    {
-        $this->authorizeForUser($request->user('api'), 'pay_due', Client::class);
+     {
+         $this->authorizeForUser($request->user('api'), 'pay_due', Client::class);
+        
+         if($request['amount'] > 0){
+            $client_sales_due = Sale::where('deleted_at', '=', null)
+            ->where([
+                ['payment_statut', '!=', 'paid'],
+                ['client_id', $request->client_id]
+            ])->get();
 
-        $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-            'client_id' => 'required|exists:clients,id',
-            'account_id' => 'nullable|exists:accounts,id',
-            'Reglement' => 'required|string',
-            'notes' => 'nullable|string',
-            'type' => 'required|string|in:credit_initial_only,credit_initial_first,credit_ventes_only,credit_ventes_first',
-        ]);
-
-        if ($request['amount'] <= 0) {
-            return response()->json(['success' => false, 'message' => 'Amount must be greater than zero.'], 400);
-        }
-
-        try {
-            $client_sales_due = Sale::whereNull('deleted_at')
-                ->where('statut', 'completed')
-                ->where('payment_statut', '!=', 'paid')
-                ->where('client_id', $request->client_id)
-                ->get();
-
-            $client = Client::whereNull('deleted_at')->where('id', $request->client_id)->first();
+            $client = Client::where('deleted_at', '=', null)->where('id', '=', $request->client_id)->first();
 
             $paid_amount_total = $request->amount;
-
-            // Handle credit_initial payments
             if ($request->type == 'credit_initial_only' || $request->type == 'credit_initial_first') {
                 $paid_aux = $request->amount;
                 if ($paid_amount_total > $client->credit_initial) {
-                    $paid_amount_total -= $client->credit_initial;
+                    $paid_amount_total = $paid_amount_total - $client->credit_initial;
                     $paid_aux = $client->credit_initial;
                     $client->credit_initial = 0;
-                } else {
-                    $client->credit_initial -= $paid_amount_total;
-                    $paid_aux = $paid_amount_total;
-                    $paid_amount_total = 0;
+                }
+                else {
+                    $client->credit_initial = $client->credit_initial - $paid_amount_total;
                 }
                 $client->save();
-                $this->createPayment($request, null, $paid_aux, null, 'credit_initial');
+                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
             }
 
-            // Handle credit_ventes payments
             if ($request->type == 'credit_ventes_only' || $request->type == 'credit_initial_first' || $request->type == 'credit_ventes_first') {
-                foreach ($client_sales_due as $client_sale) {
-                    if ($paid_amount_total == 0) break;
-                    
-                    $due = $client_sale->GrandTotal - $client_sale->paid_amount;
+                foreach($client_sales_due as $key => $client_sale){
+                    if($paid_amount_total == 0)
+                    break;
+                    $due = $client_sale->GrandTotal  - $client_sale->paid_amount;
 
-                    if ($paid_amount_total >= $due) {
+                    if($paid_amount_total >= $due){
                         $amount = $due;
                         $payment_status = 'paid';
-                    } else {
+                    }else{
                         $amount = $paid_amount_total;
                         $payment_status = 'partial';
                     }
-
                     $this->createPayment($request, $client_sale, $amount, $payment_status);
                     $paid_amount_total -= $amount;
                 }
             }
 
-            // Handle remaining credit_initial payments for 'credit_ventes_first'
             if ($paid_amount_total > 0 && $request->type == 'credit_ventes_first') {
                 $paid_aux = $paid_amount_total;
                 if ($paid_amount_total > $client->credit_initial) {
-                    $paid_amount_total -= $client->credit_initial;
+                    $paid_amount_total = $paid_amount_total - $client->credit_initial;
                     $paid_aux = $client->credit_initial;
                     $client->credit_initial = 0;
-                } else {
-                    $client->credit_initial -= $paid_amount_total;
-                    $paid_aux = $paid_amount_total;
-                    $paid_amount_total = 0;
+                }
+                else {
+                    $client->credit_initial = $client->credit_initial - $paid_amount_total;
                 }
                 $client->save();
-                $this->createPayment($request, null, $paid_aux, null, 'credit_initial');
+                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
             }
-
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            Log::error('Error processing client payment due: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'An error occurred while processing the payment :'. $e->getMessage()], 500);
+            
         }
-    }
+         return response()->json(['success' => true]);
+ 
+     }
 
-    protected function createPayment($request, $client_sale = null, $amount, $payment_status, $type = 'sale')
-    {
+    protected function createPayment($request, $client_sale = null, $amount, $payment_status, $type = 'commande') {
         $payment_sale = new PaymentSale();
-        if (isset($client_sale)) {
+        if ($client_sale !== null) {
             $payment_sale->sale_id = $client_sale->id;
         }
         $payment_sale->Ref = app('App\Http\Controllers\PaymentSalesController')->getNumberOrder();
         $payment_sale->date = Carbon::now();
-        $payment_sale->Reglement = $request->Reglement;
+        $payment_sale->Reglement = $request['Reglement'];
         $payment_sale->montant = $amount;
         $payment_sale->change = 0;
-        $payment_sale->notes = $request->notes;
-        $payment_sale->user_id = Auth::id();
+        $payment_sale->notes = $request['notes'];
+        $payment_sale->user_id = Auth::user()->id;
         $payment_sale->type_credit = $type;
         $payment_sale->save();
-
-        if (isset($client_sale)) {
+        if ($client_sale !== null) {
             $client_sale->paid_amount += $amount;
             $client_sale->payment_statut = $payment_status;
             $client_sale->save();
-        }
-
-        if ($request['account_id']) {
-            $account = Account::find($request['account_id']);
-            if ($account) {
-                $account->balance += $amount;
-                $account->save();
-            }
         }
     }
 
@@ -507,4 +475,26 @@ class ClientController extends BaseController
 
         return response()->json(['success' => true]);
     }
+
+    public function exportAllClients()
+    {
+        $clients = Client::where('deleted_at', '=', null)->get();
+        $data = [];
+
+        foreach ($clients as $client) {
+            $item = [
+                'id' => $client->id,
+                'name' => $client->name,
+                'phone' => $client->phone,
+                'city' => $client->city,
+                'total_credit' => ($client->credit_initial ?? 0) + ($client->due ?? 0) - ($client->return_Due ?? 0),
+            ];
+
+            $data[] = $item;
+        }
+
+        return response()->json($data);
+    }
+
+    
 }

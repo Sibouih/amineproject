@@ -26,6 +26,7 @@ export default {
     CountStock: 'Compter Stock',
     Successfully_Generated_Count: 'Comptage Généré avec Succès',
     Count: 'Décompte',
+    Export_clients: 'Imprimer les clients',
     file: 'Fichier',
     Accounting: 'Comptabilité',
     deposit_delete: 'Supprimer le Dépôt',

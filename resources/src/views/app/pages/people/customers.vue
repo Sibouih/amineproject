@@ -47,18 +47,26 @@
             {{ $t("Filter") }}
           </b-button>
           <b-button @click="clients_PDF()" size="sm" variant="outline-success m-1">
-            <i class="i-File-Copy"></i> PDF
-          </b-button>
-           <vue-excel-xlsx
-              class="btn btn-sm btn-outline-danger ripple m-1"
-              :data="clients"
-              :columns="columns"
-              :file-name="'clients'"
-              :file-type="'xlsx'"
-              :sheet-name="'clients'"
-              >
-              <i class="i-File-Excel"></i> EXCEL
+            <i class="i-File-Copy"></i> PDF {{$t('Export_clients')}}
+          </b-button>       
+          <vue-excel-xlsx
+            class="d-none"
+            ref="allClientsExport"
+            :data="allClientsData"
+            :columns="allClientsColumns"
+            :file-name="'all_clients'"
+            :file-type="'xlsx'"
+            :sheet-name="'All Clients'"
+          >
           </vue-excel-xlsx>
+
+          <b-button
+            @click="fetchAllClients"
+            size="sm"
+            variant="outline-success m-1"
+          >
+            <i class="i-File-Excel"></i> Excel {{$t('Export_clients')}}
+          </b-button>     
           <b-button
             @click="Show_import_clients()"
             size="sm"
@@ -918,8 +926,10 @@ import { mapActions, mapGetters } from "vuex";
 import NProgress from "nprogress";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import * as XLSX from 'xlsx';
 
-export default {
+
+export default {  
   metaInfo: {
     title: "Customer"
   },
@@ -1007,6 +1017,14 @@ export default {
         NewPassword: null,
       },
       email_exist : "",
+      allClientsData: [],
+      allClientsColumns: [
+        { label: 'no Client', field: 'id' },
+        { label: 'Nom & prénom', field: 'name' },
+        { label: 'Tél', field: 'phone' },
+        { label: 'Ville', field: 'city' },
+        { label: 'Crédit', field: 'total_credit' },
+      ],
     };
   },
 
@@ -1060,24 +1078,10 @@ export default {
           type: "decimal",
           tdClass: "text-left",
           thClass: "text-left"
-        },
-        {
-          label: this.$t("Tax_Number"),
-          field: "tax_number",
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
+        },        
         {
           label: this.$t("Total_Sale_Due"),
           field: "due",
-          type: "decimal",
-          tdClass: "text-left",
-          thClass: "text-left",
-          sortable: false
-        },
-        {
-          label: this.$t("Total_Credit"),
-          field: "total_credit",
           type: "decimal",
           tdClass: "text-left",
           thClass: "text-left",
@@ -1091,7 +1095,14 @@ export default {
           thClass: "text-left",
           sortable: false
         },
-
+        {
+          label: this.$t("Total_Credit"),
+          field: "total_credit",
+          type: "decimal",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
         {
           label: this.$t("Action"),
           field: "actions",
@@ -1287,27 +1298,113 @@ export default {
       });
     },
 
-    //--------------------------------- Customers PDF -------------------------------\\
-    clients_PDF() {
-      var self = this;
+    prepareExportData(data) {
+      // Filter clients with credit > 0
+      const filteredData = data.filter(client => parseFloat(client.total_credit) > 0);
+      
+      if (filteredData.length === 0) {
+        this.makeToast("warning", this.$t("No clients with credit found"), this.$t("Warning"));
+        return null;
+      }
 
-      let pdf = new jsPDF("p", "pt");
-      let columns = [
-        { title: "Code", dataKey: "code" },
-        { title: "Name", dataKey: "name" },
-        { title: "Sale Due", dataKey: "due" },
-        { title: "Sell Return Due", dataKey: "return_Due" },
-        { title: "Phone", dataKey: "phone" },
-        { title: "City", dataKey: "city" },
-        { title: "Remise", dataKey: "remise" },
-        { title: "Crédit initial", dataKey: "credit_initial" },
-      ];
-      pdf.autoTable(columns, self.clients);
-      pdf.text("Liste des clients", 40, 25);
-      pdf.save("Customer_List.pdf");
+      // Calculate total credit
+      const totalCredit = filteredData.reduce((sum, client) => sum + (parseFloat(client.total_credit) || 0), 0);
+      
+      // Add total row
+      filteredData.push({
+        id: '',
+        name: 'Total',
+        phone: '',
+        city: '',
+        total_credit: totalCredit
+      });
+
+      return filteredData;
     },
 
+    //--------------------------------- Customers PDF -------------------------------\\
+    clients_PDF() {
+      this.isLoading = true;
+      axios.get("clients_export_all")
+        .then(response => {
+          if (!response.data || !Array.isArray(response.data)) {
+            throw new Error('Invalid data received from server');
+          }
 
+          this.allClientsData = this.prepareExportData(response.data);
+          
+          if (this.allClientsData) {
+            this.exportToPDF(this.allClientsData, this.allClientsColumns, 'clients_with_credit');
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+          this.makeToast("danger", this.$t("Error fetching data for PDF export"), this.$t("Failed"));
+        })
+        .finally(() => {
+          this.isLoading = false;
+        });
+    },
+
+    exportToPDF(data, columns, fileName) {
+      if (!Array.isArray(data) || data.length === 0 || !Array.isArray(columns) || columns.length === 0) {
+        this.makeToast("danger", "Invalid data for PDF export", "Failed");
+        return;
+      }
+
+      const pdf = new jsPDF('l', 'pt', 'a4');
+
+      // Add title
+      pdf.setFontSize(18);
+      const title = 'Liste des clients avec crédits';
+      const pageWidth = pdf.internal.pageSize.width;
+      const titleWidth = pdf.getStringUnitWidth(title) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
+      const titleX = (pageWidth - titleWidth) / 2;
+
+      pdf.text(title, titleX, 40);
+      // Add underline
+      pdf.setLineWidth(0.5);
+      pdf.line(titleX, 45, titleX + titleWidth, 45);
+
+      pdf.setFontSize(12);
+      
+      // Prepare the data
+      const rows = data.map(item => 
+        columns.map(col => {
+          const value = item[col.field];
+          return value !== undefined && value !== null ? value.toString() : '';
+        })
+      );
+      
+      // Prepare the headers
+      const headers = columns.map(col => col.label);
+
+      try {
+        // Add the table
+        pdf.autoTable({
+          head: [headers],
+          body: rows,
+          startY: 60,
+          margin: { top: 60, right: 40, bottom: 40, left: 40 },
+          styles: { font: 'helvetica', fontSize: 8, overflow: 'linebreak', cellWidth: 'wrap' },
+          columnStyles: { text: { cellWidth: 'auto' } },
+          didParseCell: function (data) {
+            if (data.row.index === rows.length - 1) {
+              data.cell.styles.fillColor = [255, 255, 0];
+              data.cell.styles.textColor = [0, 0, 0];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+
+        // Save the PDF
+        pdf.save(`${fileName}.pdf`);
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        this.makeToast("danger", "Error generating PDF", "Failed");
+      }
+    },
+    
     //--------------------------------------- Get All Clients -------------------------------\\
     Get_Clients(page) {
       // Start the progress bar.
@@ -1918,9 +2015,72 @@ export default {
       return `${value[0]}.${formated}`;
     },
 
+    fetchAllClients() {
+      this.isLoading = true;
+      axios.get("clients_export_all")
+        .then(response => {
+          if (!response.data || !Array.isArray(response.data)) {
+            throw new Error('Invalid data received from server');
+          }
 
+          this.allClientsData = this.prepareExportData(response.data);
+          
+          if (this.allClientsData) {
+            this.exportToExcel(this.allClientsData, this.allClientsColumns, 'clients_with_credit');
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+          this.makeToast("danger", this.$t("Error fetching data for export"), this.$t("Failed"));
+        })
+        .finally(() => {
+          this.isLoading = false;
+        });
+    },
+    
+    exportToExcel(data, columns, fileName) {
+      try {
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          throw new Error('No data to export');
+        }
 
-  }, // END METHODS
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Clients with Credit");
+
+        // Add headers
+        XLSX.utils.sheet_add_aoa(worksheet, [columns.map(col => col.label)], { origin: "A1" });
+
+        // AutoFit columns
+        const max_width = columns.map(col => col.label.length);
+        for (let i = 0; i < data.length; i++) {
+          columns.forEach((col, j) => {
+            const value = data[i][col.field];
+            max_width[j] = Math.max(max_width[j], value ? value.toString().length : 0);
+          });
+        }
+        worksheet["!cols"] = max_width.map(w => ({ wch: w }));
+
+        // Style the total row
+        const lastRow = XLSX.utils.decode_range(worksheet['!ref']).e.r;
+        for (let i = 0; i < columns.length; i++) {
+          const cellRef = XLSX.utils.encode_cell({r: lastRow, c: i});
+          if (worksheet[cellRef]) {
+            if (!worksheet[cellRef].s) worksheet[cellRef].s = {};
+            worksheet[cellRef].s.font = { bold: true };
+            worksheet[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
+          }
+        }
+
+        XLSX.writeFile(workbook, `${fileName}.xlsx`);
+      } catch (error) {
+        console.error('Error in exportToExcel:', error);
+        this.makeToast("danger", this.$t("Error exporting data to Excel"), this.$t("Failed"));
+      }
+    },
+
+  }, 
+  // END METHODS
 
   //----------------------------- Created function-------------------
 
