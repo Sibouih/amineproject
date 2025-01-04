@@ -107,16 +107,13 @@ class ProductsController extends BaseController
                     $avgPrice = $this->getAveragePrice($product->id, $request->warehouse_id) ?? 0;
                     $item['cost'] = $avgCost;
                     $item['price'] = $avgPrice;
-                    $item['benefice'] = $avgPrice ? number_format($avgPrice - $avgCost, 2, '.', ',') : 0;
                 } else {                          
                     $item['cost']  = $product->cost;
                     $item['price'] = $product->price;
-                    $item['benefice'] = number_format($product->price - $product->cost, 2, '.', ',');
                 }
               $item['quantity'] = $product_warehouse_total_qty .' '.$product['unit']->ShortName;
-              $item['total_cost'] = (float)$item['cost'] * $product_warehouse_total_qty;
-              $item['total_amount'] = (float)$item['price'] * $product_warehouse_total_qty;
-              $item['total_profit'] = $item['benefice'] * $product_warehouse_total_qty;
+              $item['stockage'] = $product->stockage;
+              $item['battery'] = $product->battery;
 
             }elseif($product->type == 'is_variant'){
 
@@ -142,7 +139,6 @@ class ProductsController extends BaseController
                   ->sum('qte');
                  
                   $item['quantity'] = $product_warehouse_total_qty .' '.$product['unit']->ShortName;
-                  $item['total_amount'] = number_format($product_variant->price * $product_warehouse_total_qty, 2, '.', ',');
 
             }else{
                   $item['name'] = $product->name;
@@ -205,6 +201,8 @@ class ProductsController extends BaseController
                 'unit_id'      => Rule::requiredIf($request->type != 'is_service'),
                 'cost'         => Rule::requiredIf($request->type == 'is_single'),
                 'price'        => Rule::requiredIf($request->type != 'is_variant'),
+                'stockage' => 'nullable|string|max:255',
+                'battery' => 'nullable|string|max:255',
             ];
 
 
@@ -338,8 +336,8 @@ class ProductsController extends BaseController
                 'code.required' => 'This field is required',
             ]);
 
-
-            \DB::transaction(function () use ($request) {
+            $product = new Product;
+            \DB::transaction(function () use ($request, &$product) {
 
                 //-- Create New Product
                 $Product = new Product;
@@ -354,6 +352,8 @@ class ProductsController extends BaseController
                 $Product->note         = $request['note'];
                 $Product->TaxNet       = $request['TaxNet'] ? $request['TaxNet'] : 0;
                 $Product->tax_method   = $request['tax_method'];
+                $Product->stockage = $request['stockage'];
+                $Product->battery = $request['battery'];
 
 
                  //-- check if type is_single
@@ -448,6 +448,7 @@ class ProductsController extends BaseController
 
                 $Product->image = $filename;
                 $Product->save();
+                $product = $Product;
 
                // Store Variants Product
                if ($request['type'] == 'is_variant') {
@@ -493,9 +494,38 @@ class ProductsController extends BaseController
                     product_warehouse::insert($product_warehouse);
                 }
 
+                // In the store method, add to the Product creation:
+                $Product->stockage = $request['stockage'];
+                $Product->battery = $request['battery'];
+
             }, 10);
 
-            return response()->json(['success' => true]);
+            // Prepare the product data needed for purchase
+            $productData = [
+                'id' => $product->id,
+                'name' => $product->name,
+                'code' => $product->code,
+                'Net_cost' => $product->cost,
+                'Unit_cost' => $product->cost,
+                'fix_cost' => $product->cost,
+                'tax_method' => $product->tax_method,
+                'tax_percent' => $product->TaxNet,
+                'tax_cost' => $product->TaxNet > 0 ? 
+                    ($product->tax_method == '1' ? 
+                        ($product->cost * $product->TaxNet / 100) : 
+                        ($product->cost - ($product->cost / (($product->TaxNet / 100) + 1)))) 
+                    : 0,
+                'is_imei' => $product->is_imei,
+                'qte_purchase' => 0, // Initial quantity
+                'unitPurchase' => 'pc',
+                'purchase_unit_id' => 1,
+                'product_variant_id' => null  // Add this line
+            ];
+
+            return response()->json([
+                'success' => true,
+                'product' => $productData
+            ]);
 
         } catch (ValidationException $e) {
             return response()->json([
@@ -536,6 +566,8 @@ class ProductsController extends BaseController
                 'unit_id'     => Rule::requiredIf($request->type != 'is_service'),
                 'cost'        => Rule::requiredIf($request->type == 'is_single'),
                 'price'       => Rule::requiredIf($request->type != 'is_variant'),
+                'stockage' => 'nullable|string|max:255',
+                'battery' => 'nullable|string|max:255',
             ];
 
 
@@ -680,7 +712,6 @@ class ProductsController extends BaseController
 
 
 
-
             \DB::transaction(function () use ($request, $id) {
 
                 $Product = Product::where('id', $id)
@@ -697,6 +728,8 @@ class ProductsController extends BaseController
                 $Product->TaxNet = $request['TaxNet'];
                 $Product->tax_method = $request['tax_method'];
                 $Product->note = $request['note'];
+                $Product->stockage = $request['stockage'];
+                $Product->battery = $request['battery'];
 
                  //-- check if type is_single
                  if($request['type'] == 'is_single'){
@@ -977,6 +1010,10 @@ class ProductsController extends BaseController
                 $Product->image = $filename;
                 $Product->save();
 
+                // In the update method, add to the Product update:
+                $Product->stockage = $request['stockage'];
+                $Product->battery = $request['battery'];
+
             }, 10);
 
             return response()->json(['success' => true]);
@@ -1094,6 +1131,8 @@ class ProductsController extends BaseController
         $item['price'] = $Product->price;
         $item['cost'] = $Product->cost;
         $item['stock_alert'] = $Product->stock_alert;
+        $item['stockage'] = $Product->stockage;
+        $item['battery'] = $Product->battery;
         $item['taxe'] = $Product->TaxNet;
         $item['tax_method'] = $Product->tax_method == '1' ? 'Exclusive' : 'Inclusive';
 
@@ -1258,9 +1297,14 @@ class ProductsController extends BaseController
             }
 
             $item['manage_stock'] = $product_warehouse->manage_stock;
+            $item['cost'] = $product_warehouse['product']->cost;
             $item['qte'] = $product_warehouse['product']->type!='is_service'?$product_warehouse->qte:'---';
             $item['unitSale'] = $product_warehouse['product']['unitSale']?$product_warehouse['product']['unitSale']->ShortName:'';
             $item['unitPurchase'] = $product_warehouse['product']['unitPurchase']?$product_warehouse['product']['unitPurchase']->ShortName:'';
+            $item['category'] = $product_warehouse['product']['category']?$product_warehouse['product']['category']->name:'';
+            $item['brand'] = $product_warehouse['product']['brand']?$product_warehouse['product']['brand']->name:'';
+            $item['battery'] = $product_warehouse['product']['battery']?$product_warehouse['product']['battery']:'';
+            $item['stockage'] = $product_warehouse['product']['stockage']?$product_warehouse['product']['stockage']:'';
 
             if ($product_warehouse['product']->TaxNet !== 0.0) {
                 //Exclusive
@@ -1588,6 +1632,8 @@ class ProductsController extends BaseController
         $item['cost'] = $Product->cost;
         $item['stock_alert'] = $Product->stock_alert;
         $item['TaxNet'] = $Product->TaxNet;
+        $item['stockage'] = $Product->stockage;
+        $item['battery'] = $Product->battery;
         $item['note'] = $Product->note ? $Product->note : '';
         $item['images'] = [];
         if ($Product->image != '' && $Product->image != 'no-image.png') {
@@ -1621,6 +1667,8 @@ class ProductsController extends BaseController
                 $variant_item['price'] = $variant->price;
                 $variant_item['cost'] = $variant->cost;
                 $variant_item['product_id'] = $variant->product_id;
+                $variant_item['stockage'] = $variant->stockage;
+                $variant_item['battery'] = $variant->battery;
                 $item['ProductVariant'][] = $variant_item;
             }
         } else {

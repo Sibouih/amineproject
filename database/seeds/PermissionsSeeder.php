@@ -558,9 +558,8 @@ class PermissionsSeeder extends Seeder
 		[
 			'id'    => 136,
 			'name'  => 'payroll',
-		],
+		],		
 
-		
 		)
 	);
 	}

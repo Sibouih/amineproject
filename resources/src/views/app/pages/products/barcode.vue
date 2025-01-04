@@ -31,7 +31,7 @@
             <div id="autocomplete" class="autocomplete">
               <input 
                 :placeholder="$t('Scan_Search_Product_by_Code_Name')"
-                @input='e => search_input = e.target.value' 
+                @input='e => search_input = e.target.value'
                 @keyup="search(search_input)"
                 @focus="handleFocus"
                 @blur="handleBlur"
@@ -51,6 +51,7 @@
                 <tr>
                   <th scope="col">{{$t('ProductName')}}</th>
                   <th scope="col">{{$t('CodeProduct')}}</th>
+                  <th v-if="product.battery" scope="col">{{$t('Battery')}}</th>
                   <th scope="col">{{$t('Quantity')}}</th>
                 </tr>
               </thead>
@@ -59,8 +60,9 @@
                   <td colspan="3">{{$t('NodataAvailable')}}</td>
                 </tr>
                 <tr v-else>
-                  <td>{{product.name}}</td>
+                  <td>{{product.name}} {{product.stockage ? `(${product.stockage})` : ''}}</td>
                   <td>{{product.code}}</td>
+                  <td v-if="product.battery">{{product.battery}} %</td>
                   <td>
                     <input
                       v-model.number="barcode.qte"
@@ -123,9 +125,11 @@
               <div class="barcode-row" v-if="ShowCard" id="print_barcode_label">
                 <div :class="class_type_page" v-for ="(k, i) in total_a4" :key="i">
                   <div class="barcode-item" :class="class_sheet"  v-for="(sheet, index) in sheets" :key="index" >
-                    <div class="head_barcode text-left" style=" padding-left: 10px;font-weight: bold; ">
-                      <span class="barcode-name">{{product.name}}</span>
-                      <span class="barcode-price">{{currentUser.currency}} {{product.Net_price}}</span>
+                    <div class="head_barcode" style=" padding-left: 10px;font-weight: bold;">
+                      <span class="barcode-name text-left">{{product.name}} {{product.stockage ? product.stockage : ''}}</span>
+                      <span class="barcode-price text-center" v-if="product.brand && product.brand.toLowerCase() === 'apple' && product.battery">
+                        {{product.battery}} %
+                      </span>                      
                     </div>
                     <barcode
                       class="barcode"
@@ -141,9 +145,11 @@
                 </div>
                 <div :class="class_type_page"  v-if="rest > 0">
                   <div class="barcode-item" :class="class_sheet"  v-for="(sheet, index) in rest" :key="index" >
-                    <div class="head_barcode text-left" style=" padding-left: 10px;font-weight: bold; ">
-                      <span class="barcode-name">{{product.name}}</span>
-                      <span class="barcode-price">{{currentUser.currency}} {{product.Net_price}}</span>
+                    <div class="head_barcode" style=" padding-left: 10px;font-weight: bold; ">
+                      <span class="barcode-name text-left">{{product.name}} {{product.stockage ? product.stockage : ''}}</span>
+                      <span class="barcode-price text-center" v-if="product.battery">
+                        {{product.battery}} %
+                      </span>        
                     </div>
                     <barcode
                       class="barcode"
@@ -201,6 +207,8 @@ export default {
         code: "",
         Type_barcode: "",
         barcode:"",
+        stockage:"",
+        battery:"",
         Net_price:"",
       }
     };
@@ -323,6 +331,8 @@ export default {
         this.product.name = result.name;
         this.product.Type_barcode = result.Type_barcode;
         this.product.Net_price = result.Net_price;
+        this.product.stockage = result.stockage;
+        this.product.battery = result.battery;
       }
       this.search_input= '';
       this.$refs.product_autocomplete.value = "";
@@ -402,6 +412,8 @@ export default {
       this.product.name = "";
       this.product.code = "";
       this.product.Net_price = "";
+      this.product.stockage = "";
+      this.product.battery = "";
       this.barcode.qte = 10;
       this.count = 10;
       this.barcode.warehouse_id = "";

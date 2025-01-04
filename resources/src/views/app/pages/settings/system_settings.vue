@@ -342,7 +342,7 @@ export default {
       zones_array:[],
       setting: {
         client_id: "",
-        warehouse_id: "",
+        warehouse_id: 1,
         currency_id: "",
         email: "",
         logo: "",

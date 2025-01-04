@@ -114,6 +114,22 @@
           </li>
 
           <li
+            v-show="currentUserPermissions && (currentUserPermissions.includes('Exchange_view') 
+                      || currentUserPermissions.includes('Purchases_add'))"
+            class="nav-item"
+            @mouseenter="toggleSubMenu"
+            :class="{ active: selectedParentMenu == 'exchange' }"
+            data-item="exchange"
+            :data-submenu="true"
+          >
+            <a class="nav-item-hold" href="#">
+              <i class="nav-icon i-Sync"></i>
+              <span class="nav-text">{{$t('ProductExchange')}}</span>
+            </a>
+            <div class="triangle"></div>
+          </li>
+
+          <li
             v-show="currentUserPermissions && (currentUserPermissions.includes('Sale_Returns_view') 
                         || currentUserPermissions.includes('Sale_Returns_add'))"
             class="nav-item"
@@ -336,6 +352,15 @@
               <span class="item-name">{{$t('productsList')}}</span>
             </router-link>
           </li>
+          <li
+            class="nav-item"
+            v-if="currentUserPermissions && currentUserPermissions.includes('products_view')"
+          >
+            <router-link tag="a" class to="/app/products/searchProduct">
+              <i class="nav-icon i-Files"></i>
+              <span class="item-name">{{$t('Search_a_product')}}</span>
+            </router-link>
+          </li>        
           <li
             class="nav-item"
             v-if="currentUserPermissions && currentUserPermissions.includes('barcode_view')"
@@ -611,6 +636,30 @@
           </li>
         </ul>
 
+        <ul
+          class="childNav d-none"
+          data-parent="exchange"
+          :class="{ 'd-block': selectedParentMenu == 'exchange' }"
+        >
+          <li
+            class="nav-item"
+            v-if="currentUserPermissions && currentUserPermissions.includes('Sales_add')"
+          >
+            <router-link tag="a" class to="/app/exchange/store">
+              <i class="nav-icon i-Add-File"></i>
+              <span class="item-name">{{$t('AddExchange')}}</span>
+            </router-link>
+          </li>
+          <li
+            class="nav-item"
+            v-if="currentUserPermissions && currentUserPermissions.includes('Sales_add')"
+          >
+            <router-link tag="a" class to="/app/exchange/list">
+              <i class="nav-icon i-Files"></i>
+              <span class="item-name">{{$t('ListExchanges')}}</span>
+            </router-link>
+          </li>
+        </ul>
 
         <ul
           class="childNav d-none"

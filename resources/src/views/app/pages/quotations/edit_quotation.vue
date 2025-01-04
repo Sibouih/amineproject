@@ -44,26 +44,7 @@
                       <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
                     </b-form-group>
                   </validation-provider>
-                </b-col>
-
-                <!-- warehouse -->
-                <b-col lg="4" md="4" sm="12" class="mb-3">
-                  <validation-provider name="warehouse" :rules="{ required: true}">
-                    <b-form-group slot-scope="{ valid, errors }" :label="$t('warehouse') + ' ' + '*'">
-                      <v-select
-                        :class="{'is-invalid': !!errors.length}"
-                        :state="errors[0] ? false : (valid ? true : null)"
-                        :disabled="details.length > 0"
-                        @input="Selected_Warehouse"
-                        v-model="quote.warehouse_id"
-                        :reduce="label => label.value"
-                        :placeholder="$t('Choose_Warehouse')"
-                        :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
-                      />
-                      <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
-                    </b-form-group>
-                  </validation-provider>
-                </b-col>
+                </b-col>              
                
                  <!-- Product -->
                 <b-col md="12" class="mb-5">
@@ -475,7 +456,7 @@ export default {
         notes: "",
         date: "",
         client_id: "",
-        warehouse_id: "",
+        warehouse_id: 1,
         tax_rate: 0,
         TaxNet: 0,
         shipping: 0,

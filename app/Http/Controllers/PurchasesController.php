@@ -14,7 +14,8 @@ use Illuminate\Support\Str;
 use App\Mail\CustomEmail;
 use App\Models\EmailMessage;
 use App\Models\Account;
-
+use App\Models\Brand;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -121,7 +122,6 @@ class PurchasesController extends BaseController
             ->get();
 
         foreach ($Purchases as $Purchase) {
-
             $item['id'] = $Purchase->id;
             $item['date'] = $Purchase->date;
             $item['Ref'] = $Purchase->Ref;
@@ -215,7 +215,7 @@ class PurchasesController extends BaseController
                     'discount' => $value['discount'],
                     'discount_method' => $value['discount_Method'],
                     'product_id' => $value['product_id'],
-                    'product_variant_id' => $value['product_variant_id'],
+                    'product_variant_id' => $value['product_variant_id'] ?? null,
                     'total' => $value['subtotal'],
                     'imei_number' => $value['imei_number'],
                 ];
@@ -967,10 +967,16 @@ class PurchasesController extends BaseController
          } 
 
         $suppliers = Provider::where('deleted_at', '=', null)->get(['id', 'name']);
-
+        $categories = Category::where('deleted_at', null)->get(['id', 'name']);
+        $brands = Brand::where('deleted_at', null)->get(['id', 'name']);
+        $units = Unit::where('deleted_at', null)->where('base_unit', null)->get();
+        
         return response()->json([
             'warehouses' => $warehouses,
             'suppliers' => $suppliers,
+            'categories' => $categories,
+            'brands' => $brands,
+            'units' => $units, 
         ]);
     }
 

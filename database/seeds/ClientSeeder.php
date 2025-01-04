@@ -14,19 +14,21 @@ class ClientSeeder extends Seeder
     public function run()
     {
        	// Insert some stuff
-        DB::table('clients')->insert(
-            array(
-                'id'     => 1,
-                'name'   => 'walk-in-customer',
-                'code' => 1,
-                'email' => 'walk-in-customer@example.com',
-                'country' => 'bangladesh',
-                'city' => 'dhaka',
-                'phone' => '123456780',
-                'adresse' => 'N45 , Dhaka',
-                'tax_number' => NULL,
-            )
-            
-        );
+        if (!DB::table('clients')->where('id', 1)->exists()) {
+            DB::table('clients')->insert(
+                array(
+                    'id'     => 1,
+                    'name'   => 'walk-in-customer',
+                    'code' => 1,
+                    'email' => 'walk-in-customer@example.com',
+                    'country' => 'bangladesh',
+                    'city' => 'dhaka',
+                    'phone' => '123456780',
+                    'adresse' => 'N45 , Dhaka',
+                    'tax_number' => NULL,
+                )
+                
+            );
+        }
     }
 }

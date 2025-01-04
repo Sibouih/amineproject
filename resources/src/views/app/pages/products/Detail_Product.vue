@@ -53,17 +53,13 @@
                   <td>{{$t('Price')}}</td>
                   <th>{{currentUser.currency}} {{formatNumber(product.price ,2)}}</th>
                 </tr>
-                <tr v-if="product.type != 'is_service'">
-                  <td>{{$t('Unit')}}</td>
-                  <th>{{product.unit}}</th>
+                <tr v-if="product.stockage">
+                  <td>{{$t('Storage')}}</td>
+                  <th>{{product.stockage}}</th>
                 </tr>
-                <tr>
-                  <td>{{$t('Tax')}}</td>
-                  <th>{{formatNumber(product.taxe ,2)}} %</th>
-                </tr>
-                <tr v-if="product.taxe != '0.00'">
-                  <td>{{$t('TaxMethod')}}</td>
-                  <th>{{product.tax_method}}</th>
+                <tr v-if="product.battery">
+                  <td>{{$t('Battery')}}</td>
+                  <th>{{product.battery}}%</th>
                 </tr>
                 <tr v-if="product.type != 'is_service'"> 
                   <td>{{$t('StockAlert')}}</td>
@@ -226,6 +222,7 @@ export default {
         .get(`get_product_detail/${id}`)
         .then(response => {
           this.product = response.data;
+          console.log(this.product);
           this.isLoading = false;
         })
         .catch(response => {

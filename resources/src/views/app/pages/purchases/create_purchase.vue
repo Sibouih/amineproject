@@ -67,24 +67,34 @@
 
                 <!-- Product -->
                 <b-col md="12" class="mb-5">
-                  <h6>{{$t('ProductName')}}</h6>
-                 
-                  <div id="autocomplete" class="autocomplete">
-                    <input 
-                     :placeholder="$t('Scan_Search_Product_by_Code_Name')"
-                      @input='e => search_input = e.target.value' 
-                      @keyup="search(search_input)"
-                      @focus="handleFocus"
-                      @blur="handleBlur"
-                      ref="product_autocomplete"
-                      class="autocomplete-input" />
-                    <ul class="autocomplete-result-list" v-show="focused">
-                      <li class="autocomplete-result" 
-                        v-for="product_fil in product_filter" 
-                        @mousedown="SearchProduct(product_fil, index)">{{getResultValue(product_fil)}}
-                      </li>
-                    </ul>
-                </div>
+                  <div class="d-flex align-items-center mb-3">
+                    <!-- Search Input -->
+                    <div class="flex-grow-1 mr-2">
+                      <div id="autocomplete" class="autocomplete">
+                        <input 
+                          :placeholder="$t('Scan_Search_Product_by_Code_Name')"
+                          @input='e => search_input = e.target.value' 
+                          @keyup="search(search_input)"
+                          @focus="handleFocus"
+                          @blur="handleBlur"
+                          ref="product_autocomplete"
+                          class="autocomplete-input form-control" />
+                        <ul class="autocomplete-result-list" v-show="focused">
+                          <li class="autocomplete-result" 
+                            v-for="product_fil in product_filter" 
+                            @mousedown="SearchProduct(product_fil)">{{getResultValue(product_fil)}}
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <!-- Add New Product Button -->
+                    <div>
+                      <b-button variant="primary" @click="showNewProductModal">
+                        <i class="i-Add"></i> {{$t('AddNewProduct')}}
+                      </b-button>
+                    </div>
+                  </div>
                 </b-col>
 
                 <!-- Order products  -->
@@ -319,26 +329,7 @@
     <validation-observer ref="Update_Detail_purchase">
       <b-modal hide-footer size="lg" id="form_Update_Detail" :title="detail.name">
         <b-form @submit.prevent="submit_Update_Detail">
-          <b-row>
-            <!-- Unit Cost -->
-            <b-col lg="6" md="6" sm="12">
-              <validation-provider
-                name="Product Cost"
-                :rules="{ required: true , regex: /^\d*\.?\d*$/}"
-                v-slot="validationContext"
-              >
-                <b-form-group :label="$t('ProductCost') + ' ' + '*'" id="cost-input">
-                  <b-form-input
-                    label="Product Cost"
-                    v-model.number="detail.Unit_cost"
-                    :state="getValidationState(validationContext)"
-                    aria-describedby="cost-feedback"
-                  ></b-form-input>
-                  <b-form-invalid-feedback id="cost-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
-                </b-form-group>
-              </validation-provider>
-            </b-col>
-
+          <b-row>            
             <!-- Tax Method -->
              <b-col lg="6" md="6" sm="12">
               <validation-provider name="Tax Method" :rules="{ required: true}">
@@ -419,24 +410,7 @@
                   <b-form-invalid-feedback id="Discount-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
               </validation-provider>
-            </b-col>
-
-             <!-- Unit Purchase -->
-            <b-col lg="6" md="6" sm="12">
-              <validation-provider name="Unit Purchase" :rules="{ required: true}">
-                <b-form-group slot-scope="{ valid, errors }" :label="$t('UnitPurchase') + ' ' + '*'">
-                  <v-select
-                    :class="{'is-invalid': !!errors.length}"
-                    :state="errors[0] ? false : (valid ? true : null)"
-                    v-model="detail.purchase_unit_id"
-                    :placeholder="$t('Choose_Unit_Purchase')"
-                    :reduce="label => label.value"
-                    :options="units.map(units => ({label: units.name, value: units.id}))"
-                  />
-                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
-                </b-form-group>
-              </validation-provider>
-            </b-col>
+            </b-col>            
 
             <!-- Imei or serial numbers -->
               <b-col lg="12" md="12" sm="12" v-show="detail.is_imei">
@@ -463,6 +437,173 @@
       <button class="btn btn-success scroll-to-search-button" @click="scrollToSearchInput">
         <i class="nav-icon i-Add font-weight-bold text-22"></i>
       </button>
+    </validation-observer>
+
+    <!-- Add New Product Modal -->
+    <validation-observer ref="Create_Product">
+      <b-modal id="New_Product" :title="$t('AddNewProduct')" size="lg" hide-footer>
+        <b-form @submit.prevent="Submit_Product" enctype="multipart/form-data">
+          <b-row>
+            <!-- Product Type -->
+            <b-col md="6" class="mb-2">
+              <b-form-group :label="$t('type')">
+                <v-select
+                  v-model="new_product.type"
+                  :reduce="label => label.value"
+                  :placeholder="$t('Choose_Type')"
+                  :options="[
+                    {label: 'Standard Product', value: 'is_single'},
+                    {label: 'Service', value: 'is_service'},
+                  ]"
+                />
+              </b-form-group>
+            </b-col>
+
+            <!-- Name -->
+            <b-col md="6" class="mb-2">
+              <validation-provider name="Name" :rules="{required:true, min:3, max:55}" v-slot="validationContext">
+                <b-form-group :label="$t('Name_product') + ' ' + '*'">
+                  <b-form-input
+                    :state="getValidationState(validationContext)"
+                    aria-describedby="Name-feedback"
+                    label="Name"
+                    :placeholder="$t('Enter_Name_Product')"
+                    v-model="new_product.name"
+                  ></b-form-input>
+                  <b-form-invalid-feedback id="Name-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Barcode Symbology -->
+            <b-col md="6" class="mb-2">
+              <validation-provider name="Barcode Symbology" :rules="{ required: true}">
+                <b-form-group slot-scope="{ valid, errors }" :label="$t('BarcodeSymbology') + ' ' + '*'">
+                  <v-select
+                    :class="{'is-invalid': !!errors.length}"
+                    :state="errors[0] ? false : (valid ? true : null)"
+                    v-model="new_product.Type_barcode"
+                    :reduce="label => label.value"
+                    :placeholder="$t('Choose_Symbology')"
+                    :options="[
+                      {label: 'Code 128', value: 'CODE128'},
+                      {label: 'Code 39', value: 'CODE39'},
+                      {label: 'EAN8', value: 'EAN8'},
+                      {label: 'EAN13', value: 'EAN13'},
+                      {label: 'UPC', value: 'UPC'},
+                    ]"
+                  />
+                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Code Product -->
+            <b-col md="6" class="mb-2">
+              <validation-provider name="Code Product" :rules="{ required: true}">
+                <b-form-group slot-scope="{ valid, errors }" :label="$t('CodeProduct') + ' ' + '*'">
+                  <div class="input-group">
+                    <b-form-input
+                      :class="{'is-invalid': !!errors.length}"
+                      :state="errors[0] ? false : (valid ? true : null)"
+                      v-model="new_product.code"
+                    ></b-form-input>
+                    <div class="input-group-append">
+                      <span class="input-group-text">
+                        <a @click="generateNumber()"><i class="i-Bar-Code cursor-pointer"></i></a>
+                      </span>
+                    </div>
+                    <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                  </div>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Category -->
+            <b-col md="6" class="mb-2">
+              <validation-provider name="category" :rules="{ required: true}">
+                <b-form-group slot-scope="{ valid, errors }" :label="$t('Categorie') + ' ' + '*'">
+                  <v-select
+                    :class="{'is-invalid': !!errors.length}"
+                    :state="errors[0] ? false : (valid ? true : null)"
+                    v-model="new_product.category_id"
+                    :reduce="label => label.value"
+                    :placeholder="$t('Choose_Category')"
+                    :options="categories.map(categories => ({label: categories.name, value: categories.id}))"
+                  />
+                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Brand -->
+            <b-col md="6" class="mb-2">
+              <b-form-group :label="$t('Brand')">
+                <v-select
+                  v-model="new_product.brand_id"
+                  :reduce="label => label.value"
+                  :placeholder="$t('Choose_Brand')"
+                  :options="brands.map(brands => ({label: brands.name, value: brands.id}))"
+                />
+              </b-form-group>
+            </b-col>
+
+            <!-- Cost -->
+            <b-col md="6" class="mb-2">
+              <validation-provider name="Cost" :rules="{ required: true, regex: /^\d*\.?\d*$/}" v-slot="validationContext">
+                <b-form-group :label="$t('ProductCost') + ' ' + '*'">
+                  <b-form-input
+                    :state="getValidationState(validationContext)"
+                    v-model.number="new_product.cost"
+                  ></b-form-input>
+                  <b-form-invalid-feedback>{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Price -->
+            <b-col md="6" class="mb-2">
+              <validation-provider name="Price" :rules="{ required: true, regex: /^\d*\.?\d*$/}" v-slot="validationContext">
+                <b-form-group :label="$t('ProductPrice') + ' ' + '*'">
+                  <b-form-input
+                    :state="getValidationState(validationContext)"
+                    v-model.number="new_product.price"
+                  ></b-form-input>
+                  <b-form-invalid-feedback>{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>            
+            <!-- Stock Alert -->
+            <b-col md="6" class="mb-2" v-if="new_product.type != 'is_service'">
+              <validation-provider name="Stock Alert" :rules="{ regex: /^\d*\.?\d*$/}" v-slot="validationContext">
+                <b-form-group :label="$t('StockAlert')">
+                  <b-form-input
+                    :state="getValidationState(validationContext)"
+                    v-model.number="new_product.stock_alert"
+                  ></b-form-input>
+                  <b-form-invalid-feedback>{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Note -->
+            <b-col md="12">
+              <b-form-group :label="$t('Note')">
+                <textarea v-model="new_product.note" class="form-control" :placeholder="$t('Afewwords')"></textarea>
+              </b-form-group>
+            </b-col>
+
+            <b-col md="12" class="mt-3">
+              <b-button variant="primary" type="submit" :disabled="SubmitProcessing">
+                {{ $t('submit') }}
+              </b-button>
+              <b-button variant="secondary" @click="hideNewProductModal">
+                {{ $t('Cancel') }}
+              </b-button>
+            </b-col>
+          </b-row>
+        </b-form>
+      </b-modal>
     </validation-observer>
   </div>
 </template>
@@ -540,7 +681,35 @@ export default {
         product_variant_id: "",
         is_imei: "",
         imei_number:"",
-      }
+      },
+      categories: [],
+      brands: [],
+      units: [],
+      units_sub: [],
+      images: [],
+      imageArray: [],
+      change: false,
+      new_product: {
+        type: "is_single",
+        name: "",
+        code: "",
+        Type_barcode: "CODE128",
+        cost: "",
+        price: "",
+        brand_id: "",
+        category_id: "",
+        TaxNet: "0",
+        tax_method: "1",
+        unit_id: "",
+        unit_sale_id: "",
+        unit_purchase_id: "",
+        stock_alert: "0",
+        image: "",
+        note: "",
+        is_variant: false,
+        is_imei: false,
+        not_selling: false
+      },
     };
   },
   computed: {
@@ -1071,6 +1240,9 @@ export default {
         .then(response => {
           this.suppliers = response.data.suppliers;
           this.warehouses = response.data.warehouses;
+          this.units = response.data.units;
+          this.categories = response.data.categories;
+          this.brands = response.data.brands;
           this.isLoading = false;
         })
         .catch(response => {
@@ -1078,12 +1250,114 @@ export default {
             this.isLoading = false;
           }, 500);
         });
-    }
+    },
+
+    showNewProductModal() {
+      this.$bvModal.show("New_Product");
+    },
+
+    hideNewProductModal() {
+      this.$bvModal.hide("New_Product");
+    },
+
+    async Submit_Product() {
+      try {
+        // Set default units
+        this.new_product.unit_id = 1;
+        this.new_product.unit_sale_id = 1;
+        this.new_product.unit_purchase_id = 1;
+
+        const formData = new FormData();
+        Object.entries(this.new_product).forEach(([key, value]) => {
+          formData.append(key, value);
+        });
+
+        const response = await axios.post("products", formData);
+        
+        if (response.data.success) {
+          this.hideNewProductModal();
+          this.makeToast("success", this.$t("Create.TitleProduct"), this.$t("Success"));
+          
+          // Prepare the product data for purchase
+          this.product = {
+            discount: 0,
+            DiscountNet: 0,
+            discount_Method: "2",
+            product_id: response.data.product.id,
+            name: response.data.product.name,
+            Net_cost: response.data.product.Net_cost,
+            Unit_cost: response.data.product.Unit_cost,
+            taxe: response.data.product.tax_cost,
+            tax_method: response.data.product.tax_method,
+            tax_percent: response.data.product.tax_percent,
+            unitPurchase: 'pc',
+            fix_cost: response.data.product.fix_cost,
+            product_variant_id: response.data.product.product_variant_id,
+            purchase_unit_id: 1,
+            is_imei: response.data.product.is_imei,
+            imei_number: '',
+            quantity: 1,
+            stock: response.data.product.qte_purchase || 0,
+            code: response.data.product.code
+          };
+
+          // Add the product to the purchase
+          this.add_product();
+          this.Calcul_Total();
+
+          // Reset form
+          this.new_product = {
+            type: "is_single",
+            name: "",
+            code: "",
+            Type_barcode: "CODE128",
+            cost: "",
+            price: "",
+            brand_id: "",
+            category_id: "",
+            TaxNet: "0",
+            tax_method: "1",
+            unit_id: "",
+            unit_sale_id: "",
+            unit_purchase_id: "",
+            stock_alert: "0",
+            image: "",
+            note: "",
+            is_variant: false,
+            is_imei: false,
+            not_selling: false
+          };
+
+          // Scroll to the newly added product
+          this.$nextTick(() => {
+            const productsTable = document.getElementById('products-table');
+            if (productsTable) {
+              productsTable.querySelector('tbody').lastElementChild.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+              });
+            }
+          });
+        } else {
+          this.makeToast("danger", this.$t("InvalidData"), this.$t("Failed"));
+        }
+      } catch (error) {
+        this.makeToast("danger", error.response.data.message, this.$t("Failed"));
+      }
+    },
+
+    generateNumber() {
+      this.new_product.code = Math.floor(
+        Math.pow(10, 7) + Math.random() * (Math.pow(10, 8) - Math.pow(10, 7) - 1)
+      );
+    },
   },
 
   //-----------------------------  Created function-------------------
-  created() {
-    this.GetElements();
+  async created() {
+    await Promise.all([
+      this.GetElements(),      
+    ]);
   }
 };
 </script>

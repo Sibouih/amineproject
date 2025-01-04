@@ -177,18 +177,6 @@
             </b-form-group>
           </b-col>
 
-          <!-- warehouse -->
-          <b-col md="12">
-            <b-form-group :label="$t('warehouse')">
-              <v-select
-                v-model="Filter_warehouse"
-                :reduce="label => label.value"
-                :placeholder="$t('Choose_Warehouse')"
-                :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
-              />
-            </b-form-group>
-          </b-col>
-
           <!-- Status  -->
           <b-col md="12">
             <b-form-group :label="$t('Status')">

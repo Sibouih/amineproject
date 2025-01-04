@@ -36,14 +36,7 @@
         <div slot="selected-row-actions">
           <button class="btn btn-danger" @click="delete_by_selected()">{{$t('Del')}}</button>
         </div>
-        <div slot="table-actions" class="mt-2 mb-3">
-          <v-select
-                @input="Selected_Warehouse"
-                v-model="warehouse_id"
-                :reduce="label => label.value"
-                :placeholder="$t('Choose_Warehouse')"
-                :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
-          />
+        <div slot="table-actions" class="mt-2 mb-3">         
           <router-link
             class="btn-sm btn btn-primary btn-icon m-1"
             v-if="currentUserPermissions && currentUserPermissions.includes('products_add')"
@@ -219,7 +212,7 @@ export default {
       rows: [{
         children: [],
       },],
-      warehouse_id: "",
+      warehouse_id: 1,
       isLoading: true,
       spinner: false,
       limit: "10",
@@ -279,45 +272,14 @@ export default {
           html: true,
           tdClass: "text-left",
           thClass: "text-left"
-        },
-        {
-          label: this.$t("Profit"),
-          field: "benefice",
-          html: true,
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
+        },        
         {
           label: this.$t("Quantity"),
           field: "quantity",
           tdClass: "text-left",
           headerField: this.sumTotalQte,
           thClass: "text-left"
-        },
-        {
-          label: this.$t("Total_Cost"),
-          field: "total_cost",
-          tdClass: "text-left",
-          headerField: this.sumTotalCost,
-          thClass: "text-left",
-          sortable: false
-        },
-        {
-          label: this.$t("Total_Prix"),
-          field: "total_amount",
-          tdClass: "text-left",
-          headerField: this.sumTotalAmount,
-          thClass: "text-left",
-          sortable: false
-        },
-        {
-          label: this.$t("Total_Profit"),
-          field: "total_profit",
-          tdClass: "text-left",
-          headerField: this.sumTotalProfit,
-          thClass: "text-left",
-          sortable: false
-        },
+        },        
         {
           label: this.$t("Action"),
           field: "actions",
@@ -343,11 +305,7 @@ export default {
           { title: "category", dataKey: "category" },
           { title: "cost", dataKey: "cost" },
           { title: "price", dataKey: "price" },
-          { title: "benefice", dataKey: "benefice" },
           { title: "quantity", dataKey: "quantity" },
-          { title: "total_cost", dataKey: "total_cost" },
-          { title: "total_amount", dataKey: "total_amount" },
-          { title: "total_profit", dataKey: "total_profit" }
         ];
 
        // Create a copy of self.reports for PDF generation
@@ -367,9 +325,7 @@ export default {
 
     //---------------------- Event Select Warehouse ------------------------------\\
     Selected_Warehouse(value) {
-      if (value === null) {
-        this.warehouse_id = "";
-      }
+      this.warehouse_id = "Magasin";
       this.Get_Products(1);
     },
 
@@ -384,46 +340,7 @@ export default {
         sum += qty;
       }
       return sum.toString() + " pc";
-    },
-
-    sumTotalCost(rowObj) {
-      if (!rowObj || !rowObj.children || !Array.isArray(rowObj.children)) {
-        console.error('Invalid input for Total Amount');
-        return 0;
-      }
-      let sum_cost = 0;
-
-      for (let i = 0; i < rowObj.children.length; i++) {
-        sum_cost += rowObj.children[i].total_cost;
-      }
-      return sum_cost + ' dh';
-    },
-
-    sumTotalAmount(rowObj) {
-      if (!rowObj || !rowObj.children || !Array.isArray(rowObj.children)) {
-        console.error('Invalid input for Total Amount');
-        return 0;
-      }
-      let sum_amount = 0;
-
-      for (let i = 0; i < rowObj.children.length; i++) {
-        sum_amount += rowObj.children[i].total_amount;
-      }
-      return sum_amount + ' dh';
-    },
-
-    sumTotalProfit(rowObj) {
-      if (!rowObj || !rowObj.children || !Array.isArray(rowObj.children)) {
-        console.error('Invalid input for Total Amount');
-        return 0;
-      }
-      let sum = 0;
-      for (let i = 0; i < rowObj.children.length; i++) {
-          console.log(parseFloat(rowObj.children[i].total_profit));
-          sum += parseFloat(rowObj.children[i].total_profit);
-      }
-      return sum + ' dh';
-    },
+    },      
     
     //------ Toast
     makeToast(variant, msg, title) {

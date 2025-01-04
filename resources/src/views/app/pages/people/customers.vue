@@ -568,18 +568,7 @@
                   <b-form-invalid-feedback id="name-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
               </validation-provider>
-            </b-col>
-            
-             <!-- Customer Email -->
-            <b-col md="6" sm="12">
-                <b-form-group :label="$t('Email')">
-                  <b-form-input
-                    label="email"
-                    v-model="client.email"
-                    :placeholder="$t('Email')"
-                  ></b-form-input>
-                </b-form-group>
-            </b-col>
+            </b-col>                       
 
             <!-- Customer Phone -->
             <b-col md="6" sm="12">
@@ -590,29 +579,7 @@
                     :placeholder="$t('Phone')"
                   ></b-form-input>
                 </b-form-group>
-            </b-col>
-
-            <!-- Customer Country -->
-            <b-col md="6" sm="12">
-                <b-form-group :label="$t('Country')">
-                  <b-form-input
-                    label="Country"
-                    v-model="client.country"
-                    :placeholder="$t('Country')"
-                  ></b-form-input>
-                </b-form-group>
-            </b-col>
-
-            <!-- Customer City -->
-            <b-col md="6" sm="12">
-                <b-form-group :label="$t('City')">
-                  <b-form-input
-                    label="City"
-                    v-model="client.city"
-                    :placeholder="$t('City')"
-                  ></b-form-input>
-                </b-form-group>
-            </b-col>
+            </b-col>            
 
              <!-- Credit initial -->
             <b-col md="6" sm="12">
@@ -623,31 +590,7 @@
                     :placeholder="$t('Credit_Initial')"
                   ></b-form-input>
                 </b-form-group>
-            </b-col>
-
-             <!-- Customer Tax Number -->
-            <b-col md="6" sm="12">
-                <b-form-group :label="$t('Tax_Number')">
-                  <b-form-input
-                    label="Tax Number"
-                    v-model="client.tax_number"
-                    :placeholder="$t('Tax_Number')"
-                  ></b-form-input>
-                </b-form-group>
-            </b-col>
-
-            <!-- Customer Adress -->
-            <b-col md="12" sm="12">
-                <b-form-group :label="$t('Adress')">
-                  <textarea
-                    label="Adress"
-                    class="form-control"
-                    rows="4"
-                    v-model="client.adresse"
-                    :placeholder="$t('Adress')"
-                 ></textarea>
-                </b-form-group>
-            </b-col>
+            </b-col>             
 
             <b-col md="12" class="mt-3">
                 <b-button variant="primary" type="submit"  :disabled="SubmitProcessing">{{$t('submit')}}</b-button>

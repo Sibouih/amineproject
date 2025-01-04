@@ -8,7 +8,9 @@
           :startDate="startDate" 
           :endDate="endDate" 
            @update="Submit_filter_dateRange"
-          :locale-data="locale" > 
+          :locale-data="locale" 
+          :ranges="ranges"
+          > 
 
           <template v-slot:input="picker" style="min-width: 350px;">
               {{ picker.startDate.toJSON().slice(0, 10)}} - {{ picker.endDate.toJSON().slice(0, 10)}}
@@ -101,17 +103,41 @@ export default {
        startDate: "", 
        endDate: "" 
       }, 
-      locale:{ 
-          //separator between the two ranges apply
-          Label: "Apply", 
-          cancelLabel: "Cancel", 
-          weekLabel: "W", 
-          customRangeLabel: "Custom Range", 
-          daysOfWeek: moment.weekdaysMin(), 
-          //array of days - see moment documenations for details 
-          monthNames: moment.monthsShort(), //array of month names - see moment documenations for details 
-          firstDay: 1 //ISO first day of week - see moment documenations for details
-        },
+      ranges: {
+        'Aujourd\'hui': [new Date(), new Date()],
+        'Hier': [new Date(new Date().setDate(new Date().getDate() - 1)), new Date(new Date().setDate(new Date().getDate() - 1))],
+        'Ce mois-ci': [new Date(new Date().setDate(1)), new Date()],
+        'Cette année': [new Date(new Date().setFullYear(new Date().getFullYear(), 0, 1)), new Date()],
+        'Le mois dernier': [
+          new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1, 1)),
+          new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth(), 0))
+        ]
+      },
+      locale: {
+        direction: "ltr",
+        format: "DD/MM/YYYY",
+        separator: " - ",
+        applyLabel: "Appliquer",
+        cancelLabel: "Annuler",
+        weekLabel: "S",
+        customRangeLabel: "Plage personnalisée",
+        daysOfWeek: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"],
+        monthNames: [
+          "Janvier",
+          "Février",
+          "Mars",
+          "Avril",
+          "Mai",
+          "Juin",
+          "Juillet",
+          "Août",
+          "Septembre",
+          "Octobre",
+          "Novembre",
+          "Décembre",
+        ],
+        firstDay: 1,
+      },
     };
   },
 

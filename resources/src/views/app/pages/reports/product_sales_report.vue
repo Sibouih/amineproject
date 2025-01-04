@@ -1,22 +1,26 @@
 <template>
   <div class="main-content">
-    <breadcumb :page="$t('product_sales_report')" :folder="$t('Reports')"/>
-    <div v-if="isLoading" class="loading_page spinner spinner-primary mr-3"></div>
+    <breadcumb :page="$t('product_sales_report')" :folder="$t('Reports')" />
+    <div
+      v-if="isLoading"
+      class="loading_page spinner spinner-primary mr-3"
+    ></div>
 
-     <b-col md="12" class="text-center" v-if="!isLoading">
-        <date-range-picker 
-          v-model="dateRange" 
-          :startDate="startDate" 
-          :endDate="endDate" 
-           @update="Submit_filter_dateRange"
-          :locale-data="locale" > 
-
-          <template v-slot:input="picker" style="min-width: 350px;">
-              {{ picker.startDate.toJSON().slice(0, 10)}} - {{ picker.endDate.toJSON().slice(0, 10)}}
-          </template>        
-        </date-range-picker>
-      </b-col>
-
+    <b-col md="12" class="text-center" v-if="!isLoading">
+      <date-range-picker
+        v-model="dateRange"
+        :startDate="startDate"
+        :endDate="endDate"
+        @update="Submit_filter_dateRange"
+        :locale-data="locale"
+        :ranges="ranges"
+      >
+        <template v-slot:input="picker" style="min-width: 350px">
+          {{ picker.startDate.toJSON().slice(0, 10) }} -
+          {{ picker.endDate.toJSON().slice(0, 10) }}
+        </template>
+      </date-range-picker>
+    </b-col>
 
     <div v-if="!isLoading">
       <vue-good-table
@@ -29,60 +33,78 @@
         @on-sort-change="onSortChange"
         @on-search="onSearch"
         :search-options="{
-        placeholder: $t('Search_this_table'),
-        enabled: true,
-      }"
-       :group-options="{
+          placeholder: $t('Search_this_table'),
+          enabled: true,
+        }"
+        :group-options="{
           enabled: true,
           headerPosition: 'bottom',
         }"
-       
         :pagination-options="{
-        enabled: true,
-        mode: 'records',
-        nextLabel: 'next',
-        prevLabel: 'prev',
-      }"
-        :styleClass="showDropdown?'tableOne table-hover vgt-table full-height':'tableOne table-hover vgt-table non-height'"
+          enabled: true,
+          mode: 'records',
+          nextLabel: 'next',
+          prevLabel: 'prev',
+        }"
+        :styleClass="
+          showDropdown
+            ? 'tableOne table-hover vgt-table full-height'
+            : 'tableOne table-hover vgt-table non-height'
+        "
       >
-       
         <div slot="table-actions" class="mt-2 mb-3">
-          <b-button variant="outline-info ripple m-1" size="sm" v-b-toggle.sidebar-right>
+          <b-button
+            variant="outline-info ripple m-1"
+            size="sm"
+            v-b-toggle.sidebar-right
+          >
             <i class="i-Filter-2"></i>
             {{ $t("Filter") }}
           </b-button>
-          <b-button @click="Sales_PDF()" size="sm" variant="outline-success ripple m-1">
+          <b-button
+            @click="Sales_PDF()"
+            size="sm"
+            variant="outline-success ripple m-1"
+          >
             <i class="i-File-Copy"></i> PDF
           </b-button>
           <vue-excel-xlsx
-              class="btn btn-sm btn-outline-danger ripple m-1"
-              :data="sales"
-              :columns="columns"
-              :file-name="'sales'"
-              :file-type="'xlsx'"
-              :sheet-name="'sales'"
-              >
-              <i class="i-File-Excel"></i> EXCEL
+            class="btn btn-sm btn-outline-danger ripple m-1"
+            :data="sales"
+            :columns="columns"
+            :file-name="'sales'"
+            :file-type="'xlsx'"
+            :sheet-name="'sales'"
+          >
+            <i class="i-File-Excel"></i> EXCEL
           </vue-excel-xlsx>
-         
         </div>
-
       </vue-good-table>
     </div>
 
     <!-- Sidebar Filter -->
-    <b-sidebar id="sidebar-right" :title="$t('Filter')" bg-variant="white" right shadow>
+    <b-sidebar
+      id="sidebar-right"
+      :title="$t('Filter')"
+      bg-variant="white"
+      right
+      shadow
+    >
       <div class="px-3 py-2">
         <b-row>
-
           <!-- Customer  -->
           <b-col md="12">
             <b-form-group :label="$t('Customer')">
               <v-select
-                :reduce="label => label.value"
+                :reduce="(label) => label.value"
                 :placeholder="$t('Choose_Customer')"
                 v-model="Filter_Client"
-                :options="customers.map(customers => ({label: customers.name, value: customers.id}))"
+                :options="
+                  customers.map((customers) => ({
+                    label: customers.name,
+                    value: customers.id,
+                  }))
+                "
               />
             </b-form-group>
           </b-col>
@@ -92,9 +114,14 @@
             <b-form-group :label="$t('warehouse')">
               <v-select
                 v-model="Filter_warehouse"
-                :reduce="label => label.value"
+                :reduce="(label) => label.value"
                 :placeholder="$t('Choose_Warehouse')"
-                :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
+                :options="
+                  warehouses.map((warehouses) => ({
+                    label: warehouses.name,
+                    value: warehouses.id,
+                  }))
+                "
               />
             </b-form-group>
           </b-col>
@@ -110,7 +137,11 @@
             </b-button>
           </b-col>
           <b-col md="6" sm="12">
-            <b-button @click="Reset_Filter()" variant="danger ripple btn-block m-1" size="sm">
+            <b-button
+              @click="Reset_Filter()"
+              variant="danger ripple btn-block m-1"
+              size="sm"
+            >
               <i class="i-Power-2"></i>
               {{ $t("Reset") }}
             </b-button>
@@ -118,7 +149,6 @@
         </b-row>
       </div>
     </b-sidebar>
-
   </div>
 </template>
 
@@ -127,51 +157,92 @@ import { mapActions, mapGetters } from "vuex";
 import NProgress from "nprogress";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import DateRangePicker from 'vue2-daterange-picker'
-import 'vue2-daterange-picker/dist/vue2-daterange-picker.css'
-import moment from 'moment'
+import DateRangePicker from "vue2-daterange-picker";
+import "vue2-daterange-picker/dist/vue2-daterange-picker.css";
+import moment from "moment";
 
 export default {
-
   metaInfo: {
-    title: "Product Sales Report"
+    title: "Product Sales Report",
   },
   components: { DateRangePicker },
   data() {
     return {
-      startDate: "", 
-      endDate: "", 
-      dateRange: { 
-       startDate: "", 
-       endDate: "" 
-      }, 
-      locale:{ 
-          //separator between the two ranges apply
-          Label: "Apply", 
-          cancelLabel: "Cancel", 
-          weekLabel: "W", 
-          customRangeLabel: "Custom Range", 
-          daysOfWeek: moment.weekdaysMin(), 
-          //array of days - see moment documenations for details 
-          monthNames: moment.monthsShort(), //array of month names - see moment documenations for details 
-          firstDay: 1 //ISO first day of week - see moment documenations for details
-        },
+      startDate: "",
+      endDate: "",
+      dateRange: {
+        startDate: "",
+        endDate: "",
+      },
+      ranges: {
+        "Aujourd'hui": [new Date(), new Date()],
+        Hier: [
+          new Date(new Date().setDate(new Date().getDate() - 1)),
+          new Date(new Date().setDate(new Date().getDate() - 1)),
+        ],
+        "Ce mois-ci": [new Date(new Date().setDate(1)), new Date()],
+        "Cette année": [
+          new Date(new Date().setFullYear(new Date().getFullYear(), 0, 1)),
+          new Date(),
+        ],
+        "Le mois dernier": [
+          new Date(
+            new Date().setFullYear(
+              new Date().getFullYear(),
+              new Date().getMonth() - 1,
+              1
+            )
+          ),
+          new Date(
+            new Date().setFullYear(
+              new Date().getFullYear(),
+              new Date().getMonth(),
+              0
+            )
+          ),
+        ],
+      },
+      locale: {
+        direction: "ltr",
+        format: "DD/MM/YYYY",
+        separator: " - ",
+        applyLabel: "Appliquer",
+        cancelLabel: "Annuler",
+        weekLabel: "S",
+        customRangeLabel: "Plage personnalisée",
+        daysOfWeek: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"],
+        monthNames: [
+          "Janvier",
+          "Février",
+          "Mars",
+          "Avril",
+          "Mai",
+          "Juin",
+          "Juillet",
+          "Août",
+          "Septembre",
+          "Octobre",
+          "Novembre",
+          "Décembre",
+        ],
+        firstDay: 1,
+      },
       isLoading: true,
       serverParams: {
         sort: {
           field: "id",
-          type: "desc"
+          type: "desc",
         },
         page: 1,
-        perPage: 10
+        perPage: 10,
       },
-      rows: [{
-          statut: 'Total',
-         
-          children: [
-             
-          ],
-      },],
+      rows: [
+        {
+          statut: "Total",
+
+          children: [],
+        },
+      ],
       search: "",
       totalRows: "",
       showDropdown: false,
@@ -186,11 +257,11 @@ export default {
       from: "",
     };
   },
-   mounted() {
-    this.$root.$on("bv::dropdown::show", bvEvent => {
+  mounted() {
+    this.$root.$on("bv::dropdown::show", (bvEvent) => {
       this.showDropdown = true;
     });
-    this.$root.$on("bv::dropdown::hide", bvEvent => {
+    this.$root.$on("bv::dropdown::hide", (bvEvent) => {
       this.showDropdown = false;
     });
   },
@@ -202,33 +273,33 @@ export default {
           label: this.$t("date"),
           field: "date",
           tdClass: "text-left",
-          thClass: "text-left"
+          thClass: "text-left",
         },
         {
           label: this.$t("Reference"),
           field: "Ref",
           tdClass: "text-left",
-          thClass: "text-left"
+          thClass: "text-left",
         },
         {
           label: this.$t("Customer"),
           field: "client_name",
           tdClass: "text-left",
-          thClass: "text-left"
+          thClass: "text-left",
         },
         {
           label: this.$t("warehouse"),
           field: "warehouse_name",
           tdClass: "text-left",
-          thClass: "text-left"
+          thClass: "text-left",
         },
-      
+
         {
           label: this.$t("Name_product"),
           field: "product_name",
           tdClass: "text-left",
           thClass: "text-left",
-          sortable: false
+          sortable: false,
         },
         {
           label: this.$t("Qty_sold"),
@@ -237,7 +308,7 @@ export default {
           headerField: this.sumCount,
           tdClass: "text-left",
           thClass: "text-left",
-          sortable: false
+          sortable: false,
         },
         {
           label: this.$t("Total"),
@@ -246,30 +317,26 @@ export default {
           headerField: this.sumCount2,
           tdClass: "text-left",
           thClass: "text-left",
-          sortable: false
+          sortable: false,
         },
       ];
-    }
+    },
   },
   methods: {
-
     sumCount(rowObj) {
-     
-    	let sum = 0;
+      let sum = 0;
       for (let i = 0; i < rowObj.children.length; i++) {
         sum += rowObj.children[i].quantity;
       }
       return sum;
     },
     sumCount2(rowObj) {
-     
-    	let sum = 0;
+      let sum = 0;
       for (let i = 0; i < rowObj.children.length; i++) {
         sum += rowObj.children[i].total;
       }
       return sum;
     },
-
 
     //---- update Params Table
     updateParams(newProps) {
@@ -306,13 +373,12 @@ export default {
       this.updateParams({
         sort: {
           type: params[0].type,
-          field: field
-        }
+          field: field,
+        },
       });
       this.Get_Sales(this.serverParams.page);
     },
 
-    
     onSearch(value) {
       this.search = value.searchTerm;
       this.Get_Sales(this.serverParams.page);
@@ -327,10 +393,9 @@ export default {
       this.$root.$bvToast.toast(msg, {
         title: title,
         variant: variant,
-        solid: true
+        solid: true,
       });
     },
-
 
     //------ Reset Filter
     Reset_Filter() {
@@ -340,12 +405,10 @@ export default {
       this.Get_Sales(this.serverParams.page);
     },
 
-
     //------------------------------Formetted Numbers -------------------------\\
     formatNumber(number, dec) {
-      const value = (typeof number === "string"
-        ? number
-        : number.toString()
+      const value = (
+        typeof number === "string" ? number : number.toString()
       ).split(".");
       if (dec <= 0) return value[0];
       let formated = value[1] || "";
@@ -354,7 +417,6 @@ export default {
       while (formated.length < dec) formated += "0";
       return `${value[0]}.${formated}`;
     },
-
 
     //----------------------------------- Sales PDF ------------------------------\\
     Sales_PDF() {
@@ -374,8 +436,6 @@ export default {
       pdf.save("Product_sales_report.pdf");
     },
 
-
-  
     //---------------------------------------- Set To Strings-------------------------\\
     setToStrings() {
       // Simply replaces null values with strings=''
@@ -383,23 +443,22 @@ export default {
         this.Filter_Client = "";
       } else if (this.Filter_warehouse === null) {
         this.Filter_warehouse = "";
-      } 
+      }
     },
 
     //----------------------------- Submit Date Picker -------------------\\
     Submit_filter_dateRange() {
       var self = this;
-      self.startDate =  self.dateRange.startDate.toJSON().slice(0, 10);
+      self.startDate = self.dateRange.startDate.toJSON().slice(0, 10);
       self.endDate = self.dateRange.endDate.toJSON().slice(0, 10);
       self.Get_Sales(1);
     },
 
-
     get_data_loaded() {
       var self = this;
       if (self.today_mode) {
-        let startDate = new Date("01/01/2000");  // Set start date to "01/01/2000"
-        let endDate = new Date();  // Set end date to current date
+        let startDate = new Date("01/01/2000"); // Set start date to "01/01/2000"
+        let endDate = new Date(); // Set end date to current date
 
         self.startDate = startDate.toISOString();
         self.endDate = endDate.toISOString();
@@ -408,7 +467,6 @@ export default {
         self.dateRange.endDate = endDate.toISOString();
       }
     },
-
 
     //----------------------------------------- Get all Sales ------------------------------\\
     Get_Sales(page) {
@@ -438,7 +496,7 @@ export default {
             "&from=" +
             this.startDate
         )
-        .then(response => {
+        .then((response) => {
           this.sales = response.data.sales;
           this.customers = response.data.customers;
           this.warehouses = response.data.warehouses;
@@ -449,7 +507,7 @@ export default {
           this.isLoading = false;
           this.today_mode = false;
         })
-        .catch(response => {
+        .catch((response) => {
           // Complete the animation of theprogress bar.
           NProgress.done();
           setTimeout(() => {
@@ -458,15 +516,10 @@ export default {
           }, 500);
         });
     },
-
-  
-  
-  
   },
   //----------------------------- Created function-------------------\\
   created() {
     this.Get_Sales(1);
-  }
+  },
 };
 </script>
-

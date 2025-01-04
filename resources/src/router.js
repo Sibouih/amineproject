@@ -119,6 +119,15 @@ const baseRoutes = [
                                 /* webpackChunkName: "units" */ "./views/app/pages/products/units"
                             )
                     },
+
+                    {
+                        name: "searchProduct",
+                        path: "SearchProduct",
+                        component: () =>
+                            import(
+                                /* webpackChunkName: "searchProduct" */ "./views/app/pages/products/searchProduct"
+                            )
+                    },
                 ]
             },
 
@@ -360,7 +369,7 @@ const baseRoutes = [
                         path: "create_sale/:id",
                         component: () =>
                             import(
-                                /* webpackChunkName: "change_to_sale" */ "./views/app/pages/sales/change_to_sale.vue"
+                                /* webpackChunkName: "change_to_sale" */ "./views/app/pages/sales/change_to_sale"
                             )
                     }
                 ]
@@ -475,6 +484,33 @@ const baseRoutes = [
                         component: () =>
                             import(
                                 /* webpackChunkName: "shipment" */ "./views/app/pages/sales/shipments"
+                            )
+                    }
+                ]
+            },
+            
+            {
+                path: "/app/exchange",
+                component: () =>
+                    import(
+                        /* webpackChunkName: "exchange" */ "./views/app/pages/exchange"
+                    ),
+                redirect: "/app/exchange/list",
+                children: [
+                    {
+                        name: "index_exchange",
+                        path: "list",                        
+                        component: () =>
+                            import(
+                                /* webpackChunkName: "index_exchange" */ "./views/app/pages/exchange/index_exchange"
+                            )
+                    },
+                    {
+                        name: "store_exchange",
+                        path: "store",                        
+                        component: () =>
+                            import(
+                                /* webpackChunkName: "store_exchange" */ "./views/app/pages/exchange/create_exchange"
                             )
                     }
                 ]
