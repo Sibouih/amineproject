@@ -1016,18 +1016,24 @@ export default {
     //---------------------------------Get Product Details ------------------------\\
 
     Get_Product_Details(product_id, variant_id) {
-      axios.get("/show_product_data/" + product_id +"/"+ variant_id).then(response => {
+      const warehouse_id = this.quote.warehouse_id || '';
+      const url = warehouse_id ? 
+        `/show_product_data/${product_id}/${variant_id}/${warehouse_id}` : 
+        `/show_product_data/${product_id}/${variant_id}`;
+        
+      axios.get(url).then(response => {
         this.product.del = 0;
         this.product.id = 0;
+        this.product.etat = "new";
         this.product.discount = 0;
         this.product.DiscountNet = 0;
-        this.product.etat = "new";
         this.product.discount_Method = "2";
         this.product.product_id = response.data.id;
         this.product.name = response.data.name;
         this.product.product_type = response.data.product_type;
         this.product.Net_price = response.data.Net_price;
         this.product.Unit_price = response.data.Unit_price;
+        this.product.fix_price = response.data.fix_price;
         this.product.taxe = response.data.tax_price;
         this.product.tax_method = response.data.tax_method;
         this.product.tax_percent = response.data.tax_percent;

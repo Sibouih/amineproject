@@ -41,6 +41,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
         styleClass="table-hover tableOne vgt-table"
       >
@@ -151,7 +152,6 @@ import NProgress from "nprogress";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import DateRangePicker from 'vue2-daterange-picker'
-//you need to import the CSS manually
 import 'vue2-daterange-picker/dist/vue2-daterange-picker.css'
 import moment from 'moment'
 
@@ -242,14 +242,7 @@ export default {
           field: "Reglement",
           tdClass: "text-left",
           thClass: "text-left"
-        },
-        {
-          label: this.$t("Account"),
-          field: "account_name",
-          tdClass: "text-left",
-          thClass: "text-left",
-          sortable: false
-        },
+        },       
         {
           label: this.$t("Amount"),
           field: "montant",

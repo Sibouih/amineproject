@@ -42,6 +42,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
         :styleClass="showDropdown?'tableOne table-hover vgt-table full-height':'tableOne table-hover vgt-table non-height'"
       >
@@ -95,6 +96,18 @@
                 :reduce="label => label.value"
                 :placeholder="$t('Choose_Warehouse')"
                 :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
+              />
+            </b-form-group>
+          </b-col>
+
+          <!-- Product  -->
+          <b-col md="12">
+            <b-form-group :label="$t('Product')">
+              <v-select
+                :reduce="label => label.value"
+                :placeholder="$t('Choose_Product')"
+                v-model="Filter_Product"
+                :options="products.map(products => ({label: products.name, value: products.id}))"
               />
             </b-form-group>
           </b-col>
@@ -177,8 +190,10 @@ export default {
       showDropdown: false,
       Filter_Client: "",
       Filter_warehouse: "",
+      Filter_Product: "",
       customers: [],
       warehouses: [],
+      products: [],
       sales: [],
       limit: "10",
       today_mode: true,
@@ -337,6 +352,7 @@ export default {
       this.search = "";
       this.Filter_Client = "";
       this.Filter_warehouse = "";
+      this.Filter_Product = "";
       this.Get_Sales(this.serverParams.page);
     },
 
@@ -383,6 +399,8 @@ export default {
         this.Filter_Client = "";
       } else if (this.Filter_warehouse === null) {
         this.Filter_warehouse = "";
+      } else if (this.Filter_Product === null) {
+        this.Filter_Product = "";
       } 
     },
 
@@ -425,6 +443,8 @@ export default {
             this.Filter_Client +
             "&warehouse_id=" +
             this.Filter_warehouse +
+            "&product_id=" +
+            this.Filter_Product +
             "&SortField=" +
             this.serverParams.sort.field +
             "&SortType=" +
@@ -442,6 +462,7 @@ export default {
           this.sales = response.data.sales;
           this.customers = response.data.customers;
           this.warehouses = response.data.warehouses;
+          this.products = response.data.products;
           this.totalRows = response.data.totalRows;
           this.rows[0].children = this.sales;
           // Complete the animation of theprogress bar.

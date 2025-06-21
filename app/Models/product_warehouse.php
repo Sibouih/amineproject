@@ -9,7 +9,7 @@ class product_warehouse extends Model
     protected $table = 'product_warehouse';
 
     protected $fillable = [
-        'product_id', 'warehouse_id', 'qte','manage_stock'
+        'product_id', 'warehouse_id', 'qte', 'manage_stock', 'price', 'cost'
     ];
 
     protected $casts = [
@@ -17,6 +17,8 @@ class product_warehouse extends Model
         'warehouse_id' => 'integer',
         'manage_stock' => 'integer',
         'qte' => 'double',
+        'price' => 'double',
+        'cost' => 'double',
     ];
 
     public function warehouse()

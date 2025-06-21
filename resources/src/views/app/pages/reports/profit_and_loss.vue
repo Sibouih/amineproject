@@ -32,6 +32,20 @@
       </b-col>
 
         <b-col md="12" class="mt-4">
+          <b-row class="justify-content-center">
+            <!-- /.Profit Using FIFO METHOD -->
+            <b-col md="4" sm="12">
+              <div class="card card-icon text-center mb-30">
+                <div class="card-body">
+                  <i class="i-Data-Upload"></i>
+                  <p class="text-muted mt-2 mb-2"> {{$t('Profit_Net')}}</p>
+                  <p
+                    class="text-primary text-24 line-height-1 m-0"
+                  >{{currentUser.currency}} {{infos.real_profit}}</p>
+                </div>                
+              </div>
+            </b-col>
+          </b-row>
           <b-row>
             <!-- /.Total Sales -->
             <b-col md="4" sm="12">
@@ -142,65 +156,7 @@
                   </p>
                 </div>
               </div>
-            </b-col>
-
-            <!-- /.Profit Using FIFO METHOD -->
-            <b-col md="4" sm="12">
-              <div class="card card-icon text-center mb-30">
-                <div class="card-body">
-                  <i class="i-Data-Upload"></i>
-                  <p class="text-muted mt-2 mb-2">Profit Net (Using FIFO METHOD)</p>
-                  <p
-                    class="text-primary text-24 line-height-1 m-0"
-                  >{{currentUser.currency}} {{infos.profit_fifo}}</p>
-                </div>
-
-                <div class="card-footer">
-                  <p>
-                    (
-                    <span
-                      class="bold"
-                    >{{currentUser.currency}} {{infos.sales_sum}}</span>
-                    {{$t('Sales')}})
-                    - (
-                    <span
-                      class="bold"
-                    >{{currentUser.currency}} {{infos.product_cost_fifo}}</span>
-                    {{$t('Product_Cost')}})
-              
-                  </p>
-                </div>
-              </div>
-            </b-col>
-
-            <!-- /.Profit Using FIFO METHOD -->
-            <b-col md="4" sm="12">
-              <div class="card card-icon text-center mb-30">
-                <div class="card-body">
-                  <i class="i-Data-Upload"></i>
-                  <p class="text-muted mt-2 mb-2">Profit Net (Using Average Cost)</p>
-                  <p
-                    class="text-primary text-24 line-height-1 m-0"
-                  >{{currentUser.currency}} {{infos.profit_average_cost}}</p>
-                </div>
-
-                <div class="card-footer">
-                  <p>
-                    (
-                    <span
-                      class="bold"
-                    >{{currentUser.currency}} {{infos.sales_sum}}</span>
-                    {{$t('Sales')}})
-                    - (
-                    <span
-                      class="bold"
-                    >{{currentUser.currency}} {{infos.averagecost}}</span>
-                    {{$t('Product_Cost')}})
-              
-                  </p>
-                </div>
-              </div>
-            </b-col>
+            </b-col>            
 
             <!-- /.Paiements Received -->
             <b-col md="4" sm="12">
@@ -370,14 +326,18 @@ export default {
     get_data_loaded() {
       var self = this;
       if (self.today_mode) {
-        let startDate = new Date("01/01/2000");  // Set start date to "01/01/2000"
-        let endDate = new Date();  // Set end date to current date
+        // Get current date for both start and end date (today only)
+        let today = new Date();
+        today.setHours(0, 0, 0, 0); // Set to start of day
+        
+        let endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999); // Set to end of day
 
-        self.startDate = startDate.toISOString();
-        self.endDate = endDate.toISOString();
+        self.startDate = today.toISOString().slice(0, 10);
+        self.endDate = endOfDay.toISOString().slice(0, 10);
 
-        self.dateRange.startDate = startDate.toISOString();
-        self.dateRange.endDate = endDate.toISOString();
+        self.dateRange.startDate = today.toISOString();
+        self.dateRange.endDate = endOfDay.toISOString();
       }
     },
 

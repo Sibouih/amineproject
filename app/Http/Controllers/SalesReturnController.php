@@ -167,7 +167,7 @@ class SalesReturnController extends BaseController
     //------------ Store new Sale Return --------------\\
 
     public function store(request $request)
-    {
+    {        
         $this->authorizeForUser($request->user('api'), 'create', SaleReturn::class);
 
         request()->validate([

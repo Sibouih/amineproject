@@ -30,6 +30,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
         styleClass="tableOne vgt-table"
       >
@@ -74,7 +75,10 @@
         </div>
 
         <template slot="table-row" slot-scope="props">
-          <span v-if="props.column.field == 'actions'">
+          <span v-if="props.column.field == 'row_number'">
+            {{ (serverParams.page - 1) * parseInt(limit) + props.index + 1 }}
+          </span>
+          <span v-else-if="props.column.field == 'actions'">
             <router-link
               v-if="currentUserPermissions && currentUserPermissions.includes('products_view')"
               v-b-tooltip.hover
@@ -87,7 +91,11 @@
               v-if="currentUserPermissions && currentUserPermissions.includes('products_edit')"
               v-b-tooltip.hover
               title="Edit"
-              :to="{ name:'edit_product', params: { id: props.row.id } }"
+              :to="{ 
+                name:'edit_product', 
+                params: { id: props.row.id },
+                query: warehouse_id ? { warehouse_id: warehouse_id } : {}
+              }"
             >
               <i class="i-Edit text-25 text-success"></i>
             </router-link>
@@ -132,11 +140,12 @@
             <!-- Name  -->
             <b-col md="12">
               <b-form-group :label="$t('ProductName')">
-                <b-form-input
-                  label="Name Product"
-                  :placeholder="$t('SearchByName')"
+                <v-select
+                  :reduce="label => label.value"
+                  :placeholder="$t('Choose_Product')"
                   v-model="Filter_name"
-                ></b-form-input>
+                  :options="products_list.map(product => ({label: product.name, value: product.id}))"
+                />
               </b-form-group>
             </b-col>
 
@@ -230,7 +239,8 @@ export default {
       categories: [],
       brands: [],
       products: {},
-      warehouses: []
+      warehouses: [],
+      products_list: []
     };
   },
 
@@ -238,6 +248,14 @@ export default {
     ...mapGetters(["currentUserPermissions"]),
     columns() {
       return [
+        {
+          label: "#",
+          field: "row_number",
+          tdClass: "text-center",
+          thClass: "text-center",
+          sortable: false,
+          width: "60px"
+        },
         {
           label: this.$t("image"),
           field: "image",
@@ -338,6 +356,7 @@ export default {
 
         let pdf = new jsPDF("p", "pt");
         let columns = [
+          { title: "#", dataKey: "row_number" },
           { title: "name", dataKey: "name" },
           { title: "code", dataKey: "code" },
           { title: "category", dataKey: "category" },
@@ -353,8 +372,9 @@ export default {
        // Create a copy of self.reports for PDF generation
        let products_pdf = JSON.parse(JSON.stringify(self.products));
 
-      // Replace <br /> with newline character '\n' in the 'name' property of each item
-      products_pdf.forEach(item => {
+      // Replace <br /> with newline character '\n' in the 'name' property of each item and add row numbers
+      products_pdf.forEach((item, index) => {
+        item.row_number = index + 1;
         item.name = item.name.replace(/<br\s*\/?>/gi, '\n');
         item.cost = item.cost.replace(/<br\s*\/?>/gi, '\n');
         item.price = item.price.replace(/<br\s*\/?>/gi, '\n');
@@ -383,7 +403,7 @@ export default {
         let qty = parseFloat(rowObj.children[i].quantity.split(" ")[0]);
         sum += qty;
       }
-      return sum.toString() + " pc";
+      return sum.toFixed(2) + " pc";
     },
 
     sumTotalCost(rowObj) {
@@ -394,9 +414,9 @@ export default {
       let sum_cost = 0;
 
       for (let i = 0; i < rowObj.children.length; i++) {
-        sum_cost += rowObj.children[i].total_cost;
+        sum_cost += parseFloat(rowObj.children[i].total_cost);
       }
-      return sum_cost + ' dh';
+      return sum_cost.toFixed(2) + ' dh';
     },
 
     sumTotalAmount(rowObj) {
@@ -407,9 +427,9 @@ export default {
       let sum_amount = 0;
 
       for (let i = 0; i < rowObj.children.length; i++) {
-        sum_amount += rowObj.children[i].total_amount;
+        sum_amount += parseFloat(rowObj.children[i].total_amount);
       }
-      return sum_amount + ' dh';
+      return sum_amount.toFixed(2) + ' dh';
     },
 
     sumTotalProfit(rowObj) {
@@ -419,10 +439,9 @@ export default {
       }
       let sum = 0;
       for (let i = 0; i < rowObj.children.length; i++) {
-          console.log(parseFloat(rowObj.children[i].total_profit));
           sum += parseFloat(rowObj.children[i].total_profit);
       }
-      return sum + ' dh';
+      return sum.toFixed(2) + ' dh';
     },
     
     //------ Toast
@@ -505,6 +524,8 @@ export default {
         this.Filter_category = "";
       } else if (this.Filter_brand === null) {
         this.Filter_brand = "";
+      } else if (this.Filter_name === null) {
+        this.Filter_name = "";
       }
     },
 
@@ -520,7 +541,7 @@ export default {
             page +
             "&code=" +
             this.Filter_code +
-            "&name=" +
+            "&product_id=" +
             this.Filter_name +
             "&category_id=" +
             this.Filter_category +
@@ -539,11 +560,19 @@ export default {
         )
         .then(response => {
           this.products = response.data.products;
+          
+          // Add row numbers to products for Excel export
+          this.products.forEach((product, index) => {
+            product.row_number = ((this.serverParams.page - 1) * parseInt(this.limit)) + index + 1;
+          });
+          
+          console.log("response.products",response.data.products);
           this.rows[0].children = this.products;
           this.warehouses = response.data.warehouses;
           this.categories = response.data.categories;
           this.brands = response.data.brands;
           this.totalRows = response.data.totalRows;
+          this.products_list = response.data.products_list;
 
           // Complete the animation of theprogress bar.
           NProgress.done();

@@ -88,19 +88,17 @@ class ProvidersController extends BaseController
                 ->where('provider_id', $provider->id)
                 ->sum('paid_amount');
 
-            $item['return_Due'] = $item['total_amount_return'] - $item['total_paid_return'];
+            $item['return_Due'] = $item['total_amount_return'];
 
             $item['id'] = $provider->id;
             $item['name'] = $provider->name;
             $item['phone'] = $provider->phone;
-            $item['tax_number'] = $provider->tax_number;
             $item['code'] = $provider->code;
-            $item['email'] = $provider->email;
             $item['country'] = $provider->country;
             $item['city'] = $provider->city;
             $item['remise'] = $provider->remise;
             $item['credit_initial'] = $provider->credit_initial ?? 0;
-            $item['total_credit'] = $provider->credit_initial + $item['due'];
+            $item['total_credit'] = $provider->credit_initial + $item['due'] - $item['total_paid_return'];
             $item['adresse'] = $provider->adresse;
             $data[] = $item;
         }

@@ -35,6 +35,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
        :styleClass="showDropdown?'tableOne table-hover vgt-table full-height':'tableOne table-hover vgt-table non-height'"
       >
@@ -226,7 +227,7 @@
         hide-footer
         size="md"
         id="modal_Pay_due"
-        title="Pay Due"
+        :title="$t('Pay_Due')"
       >
         <b-form @submit.prevent="Submit_Payment_sell_due">
           <b-row>
@@ -302,23 +303,6 @@
                           {label: 'other', value: 'other'},
                           ]"
                   ></v-select>
-                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
-                </b-form-group>
-              </validation-provider>
-            </b-col>
-
-             <!-- Account -->
-             <b-col lg="6" md="6" sm="12">
-              <validation-provider name="Account">
-                <b-form-group slot-scope="{ valid, errors }" :label="$t('Account')">
-                  <v-select
-                    :class="{'is-invalid': !!errors.length}"
-                    :state="errors[0] ? false : (valid ? true : null)"
-                    v-model="payment.account_id"
-                    :reduce="label => label.value"
-                    :placeholder="$t('Choose_Account')"
-                    :options="accounts.map(accounts => ({label: accounts.account_name, value: accounts.id}))"
-                  />
                   <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
               </validation-provider>
@@ -456,8 +440,6 @@
 
             <p>
                 <span>{{$t('date')}} : {{payment.date}} <br></span>
-                <span >{{$t('Adress')}} : {{company_info.CompanyAdress}} <br></span>
-                <span >{{$t('Phone')}} : {{company_info.CompanyPhone}} <br></span>
                 <span >{{$t('Customer')}} : {{payment.client_name}} <br></span>
               </p>
           </div>
@@ -484,7 +466,7 @@
                     <td
                       style="text-align: right;"
                       colspan="1"
-                    >{{formatNumber(payment.total_credit - payment.amount ,2)}}</td>
+                    >{{formatNumber(payment .total_credit - payment.amount ,2)}}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1065,13 +1047,7 @@ export default {
           field: "phone",
           tdClass: "text-left",
           thClass: "text-left"
-        },
-        {
-          label: this.$t("Email"),
-          field: "email",
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
+        },        
         {
           label: this.$t("Credit_Initial"),
           field: "credit_initial",
@@ -1837,7 +1813,7 @@ export default {
       this.payment.account_id = null;
       this.payment.due = row.due;
       this.payment.credit_initial = row.credit_initial;
-      this.payment.total_credit = row.credit_initial + row.due;
+      this.payment.total_credit = row.total_credit;
       this.payment.date = new Date().toISOString().slice(0, 10);
       setTimeout(() => {
         this.$bvModal.show("modal_Pay_due");

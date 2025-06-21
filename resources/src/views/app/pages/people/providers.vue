@@ -26,6 +26,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
         :styleClass="showDropdown?'tableOne table-hover vgt-table full-height':'tableOne table-hover vgt-table non-height'"
       >
@@ -89,7 +90,7 @@
                 </template>
 
                 <b-dropdown-item
-                  v-if="props.row.due > 0 && currentUserPermissions && currentUserPermissions.includes('pay_supplier_due')"
+                  v-if="props.row.total_credit > 0 && currentUserPermissions.includes('pay_supplier_due')"
                   @click="Pay_due(props.row)"
                 >
                   <i class="nav-icon i-Dollar font-weight-bold mr-2"></i>
@@ -158,14 +159,7 @@
             <b-form-group :label="$t('Phone')">
               <b-form-input label="Phone" :placeholder="$t('SearchByPhone')" v-model="Filter_Phone"></b-form-input>
             </b-form-group>
-          </b-col>
-
-          <!-- Email Provider   -->
-          <b-col md="12">
-            <b-form-group :label="$t('Email')">
-              <b-form-input label="Email" :placeholder="$t('SearchByEmail')" v-model="Filter_Email"></b-form-input>
-            </b-form-group>
-          </b-col>
+          </b-col>          
 
           <b-col md="6" sm="12">
             <b-button
@@ -211,18 +205,7 @@
                   <b-form-invalid-feedback id="name-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
               </validation-provider>
-            </b-col>
-
-             <!-- Provider Email -->
-            <b-col md="6" sm="12">
-                <b-form-group :label="$t('Email')">
-                  <b-form-input
-                    label="email"
-                    v-model="provider.email"
-                    :placeholder="$t('Email')"
-                  ></b-form-input>
-                </b-form-group>
-            </b-col>
+            </b-col>            
 
             <!-- Provider Phone -->
             <b-col md="6" sm="12">
@@ -275,7 +258,7 @@
         hide-footer
         size="md"
         id="modal_Pay_due"
-        title="Pay Due"
+        title="$t('Pay_Due')"
       >
         <b-form @submit.prevent="Submit_Payment_Purchase_due">
           <b-row>
@@ -289,15 +272,8 @@
                     :state="errors[0] ? false : (valid ? true : null)"
                     v-model="payment.due_type"
                     :reduce="label => label.value"
-                    :placeholder="$t('PleaseSelect')"
-                    :options="
-                          [
-                          {label: $t('Seulement_credit_initial'), value: 'credit_initial_only'},
-                          {label: $t('Seulement_credit_achats'), value: 'credit_achats_only'},
-                          {label: $t('Credit_achats_apres_credit_initial'), value: 'credit_achats_first'},
-                          {label: $t('Credit_initial_apres_credit_achats'), value: 'credit_initial_first'},
-                          ]"
-                          
+                    :placeholder="$t('PleaseSelect')"                    
+                    :options="paymentOptions"                          
                   ></v-select>
                   <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
@@ -615,12 +591,7 @@
                 <!-- Provider Phone -->
                 <td>{{$t('Phone')}}</td>
                 <th>{{provider.phone}}</th>
-              </tr>
-              <tr>
-                <!-- Provider Email -->
-                <td>{{$t('Email')}}</td>
-                <th>{{provider.email}}</th>
-              </tr>
+              </tr>           
               <tr>
                 <!-- Provider Credit Initial -->
                 <td>{{$t('Credit_Initial')}}</td>
@@ -697,14 +668,7 @@
 
                 <tr>
                   <td>{{$t('Phone')}}</td>
-                </tr>
-
-                <tr>
-                  <td>{{$t('Email')}}</td>
-                  <th>
-                    <span class="badge badge-outline-success"></span>
-                  </th>
-                </tr>
+                </tr>                
 
                 <tr>
                   <td>{{$t('City')}}</td>
@@ -755,7 +719,6 @@ export default {
       Filter_Name: "",
       Filter_Code: "",
       Filter_Phone: "",
-      Filter_Email: "",
       import_providers: "",
       data: new FormData(),
       company_info:{},
@@ -766,9 +729,6 @@ export default {
         name: "",
         code: "",
         phone: "",
-        email: "",
-        tax_number: "",
-        country: "",
         city: "",
         remise: 0,
         credit_initial: 0,
@@ -825,38 +785,19 @@ export default {
           tdClass: "text-left",
           thClass: "text-left"
         },
-
         {
-          label: this.$t("Phone"),
-          field: "phone",
+          label: this.$t("City"),
+          field: "city",
           tdClass: "text-left",
           thClass: "text-left"
-        },
-        {
-          label: this.$t("Email"),
-          field: "email",
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
+        },       
         {
           label: this.$t("Credit_Initial"),
           field: "credit_initial",
           type: "decimal",
           tdClass: "text-left",
           thClass: "text-left"
-        },
-        {
-          label: this.$t("City"),
-          field: "city",
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
-        {
-          label: this.$t("Tax_Number"),
-          field: "tax_number",
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
+        },        
         {
           label: this.$t("Total_Purchase_Due"),
           field: "due",
@@ -890,6 +831,22 @@ export default {
           sortable: false
         }
       ];
+    },
+    paymentOptions() {
+      const baseOptions = [
+        {label: this.$t('Seulement_credit_achats'), value: 'credit_achats_only'},
+      ];
+
+      if (this.payment.credit_initial > 0) {
+        return [
+          {label: this.$t('Seulement_credit_initial'), value: 'credit_initial_only'},
+          ...baseOptions,
+          {label: this.$t('Credit_achats_apres_credit_initial'), value: 'credit_achats_first'},
+          {label: this.$t('Credit_initial_apres_credit_achats'), value: 'credit_initial_first'},
+        ];
+      }
+
+      return baseOptions;
     }
   },
 
@@ -1039,7 +996,6 @@ export default {
       this.Filter_Name = "";
       this.Filter_Code = "";
       this.Filter_Phone = "";
-      this.Filter_Email = "";
       this.Get_Providers(this.serverParams.page);
     },
 
@@ -1060,11 +1016,9 @@ export default {
       let columns = [
         { title: "Code", dataKey: "code" },
         { title: "Name", dataKey: "name" },
-        { title: "Phone", dataKey: "phone" },
         { title: "Purchase Due", dataKey: "due" },
         { title: "Purchase Return Due", dataKey: "return_Due" },
-        { title: "City", dataKey: "city" },
-        { title: "Purchase Due", dataKey: "due" },
+        { title: "Total Credit", dataKey: "total_credit" },
         { title: "Crédit initial", dataKey: "credit_initial" },
       ];
       pdf.autoTable(columns, self.providers);
@@ -1100,11 +1054,9 @@ export default {
             "&name=" +
             this.Filter_Name +
             "&code=" +
-            this.Filter_Code +
+            this.Filter_Code +            
             "&phone=" +
             this.Filter_Phone +
-            "&email=" +
-            this.Filter_Email +
             "&SortField=" +
             this.serverParams.sort.field +
             "&SortType=" +
@@ -1139,10 +1091,6 @@ export default {
       axios
         .post("providers", {
           name: this.provider.name,
-          email: this.provider.email,
-          phone: this.provider.phone,
-          tax_number: this.provider.tax_number,
-          country: this.provider.country,
           city: this.provider.city,
           remise: this.provider.remise ?? 0,
           credit_initial: this.provider.credit_initial,
@@ -1170,10 +1118,7 @@ export default {
       axios
         .put("providers/" + this.provider.id, {
           name: this.provider.name,
-          email: this.provider.email,
-          tax_number: this.provider.tax_number,
           phone: this.provider.phone,
-          country: this.provider.country,
           city: this.provider.city,
           remise: this.provider.remise ?? 0,
           credit_initial: this.provider.credit_initial,
@@ -1210,11 +1155,8 @@ export default {
         id: "",
         name: "",
         phone: "",
-        email: "",
-        country: "",
         remise: 0,
         credit_initial: 0,
-        tax_number: "",
         city: "",
         adresse: ""
       };

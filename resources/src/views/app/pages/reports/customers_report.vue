@@ -28,6 +28,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
         styleClass="tableOne table-hover vgt-table mt-3"
       >
@@ -102,41 +103,14 @@ export default {
           sortable: false
         },
         {
-          label: this.$t("Amount"),
+          label: this.$t("Total_Sale"),
           field: "total_amount",
           type: "decimal",
           headerField: this.sumCount,
           tdClass: "text-left",
           thClass: "text-left",
           sortable: false
-        },
-        {
-          label: this.$t("Paid"),
-          field: "total_paid",
-          type: "decimal",
-          headerField: this.sumCount2,
-          tdClass: "text-left",
-          thClass: "text-left",
-          sortable: false
-        },
-        {
-          label: this.$t("Total_Sale_Due"),
-          field: "due",
-          type: "decimal",
-          headerField: this.sumCount3,
-          tdClass: "text-left",
-          thClass: "text-left",
-          sortable: false
-        },
-        {
-          label: this.$t("Total_Credit"),
-          field: "total_credit",
-          type: "decimal",
-          tdClass: "text-left",
-          headerField: this.sumTotalCredit,
-          thClass: "text-left",
-          sortable: false
-        },
+        },   
         {
           label: this.$t("Total_Sell_Return_Due"),
           field: "return_Due",
@@ -145,7 +119,16 @@ export default {
           tdClass: "text-left",
           thClass: "text-left",
           sortable: false
-        },
+        },    
+        {
+          label: this.$t("Total_Credit"),
+          field: "total_credit",
+          type: "decimal",
+          tdClass: "text-left",
+          headerField: this.sumTotalCredit,
+          thClass: "text-left",
+          sortable: false
+        },        
         {
           label: this.$t("Action"),
           field: "actions",

@@ -1,6 +1,6 @@
 <template>
   <div class="main-content">
-    <breadcumb :page="'Update Product'" :folder="$t('Products')"/>
+    <breadcumb :page="$t('Update_Product')" :folder="$t('Products')"/>
     <div v-if="isLoading" class="loading_page spinner spinner-primary mr-3"></div>
 
     <validation-observer ref="Edit_Product" v-if="!isLoading">
@@ -189,37 +189,31 @@
 
             <b-card class="mt-3">
               <b-row>
-              
-                 <!-- type -->
-
-                <b-col md="6" class="mb-2" v-if="product.type == 'is_single'">
-                  <b-form-group :label="$t('type')">
-                    <b-form-input
-                      label="Product Type"
-                      value="Standard Product"
-                      disabled="disabled"
-                    ></b-form-input>
+                <!-- Warehouse Selection -->
+                <b-col md="12" class="mb-3">
+                  <b-form-group :label="$t('Warehouse') + ' ' + $t('Optional_for_warehouse_specific_pricing')">
+                    <v-select
+                      :placeholder="$t('Choose_Warehouse')"
+                      :reduce="label => label.value"
+                      v-model="selectedWarehouse"
+                      @input="onWarehouseChange"
+                      :options="warehouses.map(warehouse => ({label: warehouse.name, value: warehouse.id}))"
+                      :clearable="true"
+                    />
+                    <small class="text-muted">{{$t('Select_a_warehouse_to_set_warehouse_specific_prices_or_leave_empty_for_global_pricing')}}</small>
                   </b-form-group>
                 </b-col>
 
-               <b-col md="6" class="mb-2" v-else-if="product.type == 'is_service'">
-                  <b-form-group :label="$t('type')">
-                    <b-form-input
-                      label="Product Type"
-                      value="Service Product"
-                      disabled="disabled"
-                    ></b-form-input>
-                  </b-form-group>
+                <!-- Global/Warehouse Pricing Info -->
+                <b-col md="12" class="mb-2" v-if="selectedWarehouse">
+                  <b-alert show variant="info">
+                    <i class="i-Information"></i> You are editing warehouse-specific pricing for: <strong>{{ getWarehouseName(selectedWarehouse) }}</strong>
+                  </b-alert>
                 </b-col>
-
-                <b-col md="6" class="mb-2" v-else-if="product.type == 'is_variant'">
-                  <b-form-group :label="$t('type')">
-                    <b-form-input
-                      label="Product Type"
-                      value="Variable Product"
-                      disabled="disabled"
-                    ></b-form-input>
-                  </b-form-group>
+                <b-col md="12" class="mb-2" v-else>
+                  <b-alert show variant="secondary">
+                    <i class="i-Information"></i> {{$t('You_are_editing_global_product_pricing')}}
+                  </b-alert>
                 </b-col>
 
                 <!-- Product Cost -->
@@ -229,17 +223,20 @@
                     :rules="{ required: true , regex: /^\d*\.?\d*$/}"
                     v-slot="validationContext"
                   >
-                    <b-form-group :label="$t('ProductCost') + ' ' + '*'">
+                    <b-form-group :label="(selectedWarehouse ? $t('Warehouse') : $t('ProductCost') + ' ' + $t('The_Global')) + ' ' + '*'">
                       <b-form-input
                         :state="getValidationState(validationContext)"
                         aria-describedby="ProductCost-feedback"
                         label="Cost"
                         :placeholder="$t('Enter_Product_Cost')"
-                        v-model="product.cost"
+                        v-model="currentCost"
                       ></b-form-input>
                       <b-form-invalid-feedback
                         id="ProductCost-feedback"
                       >{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                      <small class="text-muted" v-if="selectedWarehouse && product.cost">
+                        {{$t('Global_cost')}}: {{ product.cost }}
+                      </small>
                     </b-form-group>
                   </validation-provider>
                 </b-col>
@@ -255,81 +252,21 @@
                     :rules="{ required: true , regex: /^\d*\.?\d*$/}"
                     v-slot="validationContext"
                   >
-                    <b-form-group :label="$t('ProductPrice') + ' ' + '*'">
+                    <b-form-group :label="(selectedWarehouse ? $t('Warehouse') : $t('ProductPrice') + ' ' + $t('The_Global')) + ' ' + '*'">
                       <b-form-input
                         :state="getValidationState(validationContext)"
                         aria-describedby="ProductPrice-feedback"
                         label="Price"
                         :placeholder="$t('Enter_Product_Price')"
-                        v-model="product.price"
+                        v-model="currentPrice"
                       ></b-form-input>
 
                       <b-form-invalid-feedback
                         id="ProductPrice-feedback"
                       >{{ validationContext.errors[0] }}</b-form-invalid-feedback>
-                    </b-form-group>
-                  </validation-provider>
-                </b-col>
-
-                <!-- Unit Product -->
-                <b-col md="6" class="mb-2" v-if="product.type != 'is_service'">
-                  <validation-provider name="Unit Product" :rules="{ required: true}">
-                    <b-form-group
-                      slot-scope="{ valid, errors }"
-                      :label="$t('UnitProduct') + ' ' + '*'"
-                    >
-                      <v-select
-                        :class="{'is-invalid': !!errors.length}"
-                        :state="errors[0] ? false : (valid ? true : null)"
-                        v-model="product.unit_id"
-                        class="required"
-                        required
-                        @input="Selected_Unit"
-                        :placeholder="$t('Choose_Unit_Product')"
-                        :reduce="label => label.value"
-                        :options="units.map(units => ({label: units.name, value: units.id}))"
-                      />
-                      <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
-                    </b-form-group>
-                  </validation-provider>
-                </b-col>
-
-                <!-- Unit Sale -->
-                <b-col md="6" class="mb-2" v-if="product.type != 'is_service'">
-                  <validation-provider name="Unit Sale" :rules="{ required: true}">
-                    <b-form-group
-                      slot-scope="{ valid, errors }"
-                      :label="$t('UnitSale') + ' ' + '*'"
-                    >
-                      <v-select
-                        :class="{'is-invalid': !!errors.length}"
-                        :state="errors[0] ? false : (valid ? true : null)"
-                        v-model="product.unit_sale_id"
-                        :placeholder="$t('Choose_Unit_Sale')"
-                        :reduce="label => label.value"
-                        :options="units_sub.map(units_sub => ({label: units_sub.name, value: units_sub.id}))"
-                      />
-                      <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
-                    </b-form-group>
-                  </validation-provider>
-                </b-col>
-
-                <!-- Unit Purchase -->
-                <b-col md="6" class="mb-2" v-if="product.type != 'is_service'">
-                  <validation-provider name="Unit Purchase" :rules="{ required: true}">
-                    <b-form-group
-                      slot-scope="{ valid, errors }"
-                      :label="$t('UnitPurchase') + ' ' + '*'"
-                    >
-                      <v-select
-                        :class="{'is-invalid': !!errors.length}"
-                        :state="errors[0] ? false : (valid ? true : null)"
-                        v-model="product.unit_purchase_id"
-                        :placeholder="$t('Choose_Unit_Purchase')"
-                        :reduce="label => label.value"
-                        :options="units_sub.map(units_sub => ({label: units_sub.name, value: units_sub.id}))"
-                      />
-                      <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                      <small class="text-muted" v-if="selectedWarehouse && product.price">
+                        {{$t('Global_price')}}: {{ product.price }}
+                      </small>
                     </b-form-group>
                   </validation-provider>
                 </b-col>
@@ -354,70 +291,7 @@
                       >{{ validationContext.errors[0] }}</b-form-invalid-feedback>
                     </b-form-group>
                   </validation-provider>
-                </b-col>
-
-                <div class="col-md-9 mb-3 mt-3" v-if="product.type == 'is_variant'">
-                  <div class="d-flex">
-                    <input
-                      style="height: 40px;"
-                      placeholder="Enter the Variant"
-                      type="text"
-                      name="variant"
-                      v-model="tag"
-                      class="form-control"
-                    >
-                    <a
-                      style="color: #ffff;margin-left: 10px;"
-                      @click="add_variant(tag)"
-                      class="ms-3 btn btn-md btn-primary"
-                    >{{$t('Add')}}</a>
-                  </div>
-                </div>
-
-                <div class="col-md-9 mb-2" v-if="product.type == 'is_variant'">
-                  <div class="table-responsive">
-                    <table class="table table-hover table-sm">
-                      <thead class="bg-gray-300">
-                        <tr>
-                          <th scope="col">{{$t('Variant_code')}}</th>
-                          <th scope="col">{{$t('Variant_Name')}}</th>
-                          <th scope="col">{{$t('Variant_cost')}}</th>
-                          <th scope="col">{{$t('Variant_price')}}</th>
-                          <th scope="col"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-if="variants.length <=0">
-                          <td colspan="3">{{$t('NodataAvailable')}}</td>
-                        </tr>
-                        <tr v-for="variant in variants">
-                          <td>
-                            <input required class="form-control" v-model="variant.code">
-                          </td>
-                          <td>
-                            <input  required class="form-control" v-model="variant.text">
-                          </td>
-                          <td>
-                            <input required class="form-control" v-model="variant.cost">
-                          </td>
-                          <td>
-                            <input required class="form-control" v-model="variant.price">
-                          </td>
-                          <td>
-                            <a
-                              style="color: #ffff;"
-                              @click="delete_variant(variant.var_id)"
-                              class="btn btn-sm btn-danger"
-                              title="Delete"
-                            >
-                              <i class="i-Close-Window"></i>
-                            </a>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                </b-col>                                
               </b-row>
             </b-card>
            
@@ -521,6 +395,7 @@ export default {
       units: [],
       units_sub: [],
       brands: [],
+      warehouses: [],
       roles: {},
       variants: [],
       product: {
@@ -538,13 +413,13 @@ export default {
         unit_sale_id: "",
         unit_purchase_id: "",
         stock_alert: "",
-        image: "",
         note: "",
-        is_variant: false,
         is_imei: false,
         not_selling: false,
       },
-      code_exist: ""
+      code_exist: "",
+      selectedWarehouse: null,
+      warehousePricing: {},
     };
   },
 
@@ -574,13 +449,8 @@ export default {
             this.$t("Please_fill_the_form_correctly"),
             this.$t("Failed")
           );
-        } else {
-
-            if (this.product.type == 'is_variant' && this.variants.length <= 0) {
-              this.makeToast("danger", "The variants array is required.", this.$t("Failed"));
-            }else{
-              this.Update_Product();
-            }
+        } else {            
+            this.Update_Product();
         }
       });
     },
@@ -668,6 +538,22 @@ export default {
           this.units = response.data.units;
           this.units_sub = response.data.units_sub;
           this.Subcategories = response.data.Subcategories;
+          this.warehouses = response.data.warehouses;
+          console.log("response.data",response.data);
+
+          // Load warehouse-specific pricing if available
+          if (response.data.warehouse_pricing) {
+            this.warehousePricing = response.data.warehouse_pricing;
+          }
+
+          // Auto-select warehouse if coming from product list with warehouse filter
+          if (this.$route.query.warehouse_id) {
+            const warehouseId = parseInt(this.$route.query.warehouse_id);
+            const warehouseExists = this.warehouses.find(w => w.id === warehouseId);
+            if (warehouseExists) {
+              this.selectedWarehouse = warehouseId;
+            }
+          }
 
           this.isLoading = false;
         })
@@ -700,18 +586,33 @@ export default {
       NProgress.set(0.1);
       var self = this;
       self.data = new FormData();
-      self.SubmitProcessing = true;
-
-      if (self.product.type == 'is_variant' && self.variants.length > 0) {
-        self.product.is_variant = true;
-      }else{
-        self.product.is_variant = false;
-      }
+      self.SubmitProcessing = true;      
+      self.product.is_variant = false;
 
       // append objet product
       Object.entries(self.product).forEach(([key, value]) => {
           self.data.append(key, value);
       });
+
+      // append warehouse-specific pricing - only send data for selected warehouse
+      if (self.selectedWarehouse && self.warehousePricing[self.selectedWarehouse]) {
+        const selectedWarehousePricing = {};
+        selectedWarehousePricing[self.selectedWarehouse] = self.warehousePricing[self.selectedWarehouse];
+        self.data.append('warehouse_pricing', JSON.stringify(selectedWarehousePricing));
+      } else if (!self.selectedWarehouse && Object.keys(self.warehousePricing).length > 0) {
+        // If no warehouse is selected but we have pricing data, send all (for backward compatibility)
+        self.data.append('warehouse_pricing', JSON.stringify(self.warehousePricing));
+      }
+
+      // append selected warehouse if one is selected
+      if (self.selectedWarehouse) {
+        self.data.append('selected_warehouse', self.selectedWarehouse);
+      }
+
+      // append current warehouse context if we came from product list with warehouse filter
+      if (self.$route.query.warehouse_id) {
+        self.data.append('current_warehouse_id', self.$route.query.warehouse_id);
+      }
                 
       //append array variants
       if (self.variants.length) {
@@ -758,6 +659,16 @@ export default {
               this.makeToast("danger", this.$t("InvalidData"), this.$t("Failed"));
             }
         });
+    },
+
+    onWarehouseChange() {
+      // This method is called when warehouse selection changes
+      // The computed properties will handle the price/cost updates automatically
+    },
+
+    getWarehouseName(warehouseId) {
+      const warehouse = this.warehouses.find(w => w.id === warehouseId);
+      return warehouse ? warehouse.name : '';
     }
   }, //end Methods
 
@@ -767,6 +678,45 @@ export default {
     this.GetElements();
     this.imageArray = [];
     this.images = [];
-  }
+  },
+
+  computed: {
+    currentCost: {
+      get() {
+        if (this.selectedWarehouse && this.warehousePricing[this.selectedWarehouse]) {
+          return this.warehousePricing[this.selectedWarehouse].cost || this.product.cost;
+        }
+        return this.product.cost;
+      },
+      set(value) {
+        if (this.selectedWarehouse) {
+          if (!this.warehousePricing[this.selectedWarehouse]) {
+            this.$set(this.warehousePricing, this.selectedWarehouse, {});
+          }
+          this.$set(this.warehousePricing[this.selectedWarehouse], 'cost', value);
+        } else {
+          this.product.cost = value;
+        }
+      }
+    },
+    currentPrice: {
+      get() {
+        if (this.selectedWarehouse && this.warehousePricing[this.selectedWarehouse]) {
+          return this.warehousePricing[this.selectedWarehouse].price || this.product.price;
+        }
+        return this.product.price;
+      },
+      set(value) {
+        if (this.selectedWarehouse) {
+          if (!this.warehousePricing[this.selectedWarehouse]) {
+            this.$set(this.warehousePricing, this.selectedWarehouse, {});
+          }
+          this.$set(this.warehousePricing[this.selectedWarehouse], 'price', value);
+        } else {
+          this.product.price = value;
+        }
+      }
+    }
+  },
 };
 </script>

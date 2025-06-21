@@ -28,6 +28,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -112,6 +113,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -158,6 +160,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -219,6 +222,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -277,6 +281,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -335,6 +340,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -379,6 +385,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >

@@ -107,11 +107,11 @@ class PaymentSalesController extends BaseController
 
             $item['date']          = $Payment->date;
             $item['Ref']           = $Payment->Ref;
-            $item['Ref_Sale']      = $Payment['sale']->Ref;
-            $item['client_name']   = $Payment['sale']['client']->name;
+            $item['Ref_Sale']      = $Payment['sale'] ? $Payment['sale']->Ref : '---';
+            $item['client_name']   = $Payment['sale'] && $Payment['sale']['client'] ? $Payment['sale']['client']->name : '---';
             $item['Reglement']     = $Payment->Reglement;
             $item['montant']       = $Payment->montant;
-            $item['account_name']  = $Payment['account']?$Payment['account']->account_name:'---';
+            $item['account_name']  = $Payment['account'] ? $Payment['account']->account_name : '---';
             $data[] = $item;
         }
 
@@ -123,8 +123,11 @@ class PaymentSalesController extends BaseController
             'payments' => $data,
             'sales' => $sales,
             'clients' => $clients,
+            'date_range' => [
+                'from' => $request->from,
+                'to' => $request->to
+            ]
         ]);
-
     }
 
     //----------- Store new Payment Sale --------------\\

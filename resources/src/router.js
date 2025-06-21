@@ -119,6 +119,26 @@ const baseRoutes = [
                                 /* webpackChunkName: "units" */ "./views/app/pages/products/units"
                             )
                     },
+
+                    // warehouse pricing
+                    {
+                        name: "warehouse_pricing",
+                        path: "warehouse-pricing",
+                        component: () =>
+                            import(
+                                /* webpackChunkName: "warehouse_pricing" */ "./views/app/pages/products/warehouse_pricing"
+                            )
+                    },
+
+                    // warehouse pricing history
+                    {
+                        name: "warehouse_pricing_history",
+                        path: "warehouse-pricing-history",
+                        component: () =>
+                            import(
+                                /* webpackChunkName: "warehouse_pricing_history" */ "./views/app/pages/products/warehouse_pricing_history"
+                            )
+                    },
                 ]
             },
 
@@ -985,6 +1005,16 @@ const baseRoutes = [
                             import(
                                 /* webpackChunkName: "payments_sales_returns" */
                                 "./views/app/pages/reports/payments/payments_sales_returns"
+                            )
+                    },
+                    
+                    {
+                        name: "client_payments",
+                        path: "client_payments",
+                        component: () =>
+                            import(
+                                /* webpackChunkName: "client_payments" */
+                                "./views/app/pages/reports/payments/client_payments"
                             )
                     },
 

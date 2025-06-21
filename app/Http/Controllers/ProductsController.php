@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\product_warehouse;
+use App\Models\ProductWarehousePriceHistory;
 use App\Models\Unit;
 use App\Models\Warehouse;
 use App\Models\CountStock;
@@ -55,6 +56,13 @@ class ProductsController extends BaseController
 
         //Multiple Filter
         $Filtred = $helpers->filter($products, $columns, $param, $request)
+        
+        // Add specific filter for product_id
+        ->where(function ($query) use ($request) {
+            return $query->when($request->filled('product_id'), function ($query) use ($request) {
+                return $query->where('id', '=', $request->product_id);
+            });
+        })
         // Search With Multiple Param
             ->where(function ($query) use ($request) {
                 return $query->when($request->filled('search'), function ($query) use ($request) {
@@ -102,21 +110,27 @@ class ProductsController extends BaseController
                     })
                 ->sum('qte');
                 $item['name']  = $product->name;
-                if ($request->filled('warehouse_id') && $product_warehouse_total_qty > 0) {
-                    $avgCost = $this->getAverageCost($product->id, $request->warehouse_id) ?? 0;
-                    $avgPrice = $this->getAveragePrice($product->id, $request->warehouse_id) ?? 0;
-                    $item['cost'] = $avgCost;
-                    $item['price'] = $avgPrice;
-                    $item['benefice'] = $avgPrice ? number_format($avgPrice - $avgCost, 2, '.', ',') : 0;
+                if ($request->filled('warehouse_id')) {
+                    $cost_value = $this->getCostWarehouse($product->id, $request->warehouse_id);
+                    $price_value = $this->getPriceWarehouse($product->id, $request->warehouse_id);
+                    $benefice_value = $price_value - $cost_value;
+                    
+                    $item['cost']  = number_format($cost_value, 2, '.', '');
+                    $item['price'] = number_format($price_value, 2, '.', '');
+                    $item['benefice'] = number_format($benefice_value, 2, '.', '');
                 } else {                          
-                    $item['cost']  = $product->cost;
-                    $item['price'] = $product->price;
-                    $item['benefice'] = number_format($product->price - $product->cost, 2, '.', ',');
+                    $cost_value = $product->cost;
+                    $price_value = $product->price;
+                    $benefice_value = $product->price - $product->cost;
+                    
+                    $item['cost']  = number_format($cost_value, 2, '.', '');
+                    $item['price'] = number_format($price_value, 2, '.', '');
+                    $item['benefice'] = number_format($benefice_value, 2, '.', '');
                 }
               $item['quantity'] = $product_warehouse_total_qty .' '.$product['unit']->ShortName;
-              $item['total_cost'] = (float)$item['cost'] * $product_warehouse_total_qty;
-              $item['total_amount'] = (float)$item['price'] * $product_warehouse_total_qty;
-              $item['total_profit'] = $item['benefice'] * $product_warehouse_total_qty;
+              $item['total_cost'] = number_format($cost_value * $product_warehouse_total_qty, 2, '.', '');
+              $item['total_amount'] = number_format($price_value * $product_warehouse_total_qty, 2, '.', '');
+              $item['total_profit'] = number_format($benefice_value * $product_warehouse_total_qty, 2, '.', '');
 
             }elseif($product->type == 'is_variant'){
 
@@ -129,9 +143,9 @@ class ProductsController extends BaseController
                   $item['name'] = '';
 
                   foreach ($product_variant_data as $product_variant) {
-                      $item['cost']  .= number_format($product_variant->cost, 2, '.', ',');
+                      $item['cost']  .= number_format($product_variant->cost, 2, '.', '');
                       $item['cost']  .= '<br>';
-                      $item['price'] .= number_format($product_variant->price, 2, '.', ',');
+                      $item['price'] .= number_format($product_variant->price, 2, '.', '');
                       $item['price'] .= '<br>';
                       $item['name']  .= $product_variant->name.'-'.$product->name;
                       $item['name']  .= '<br>';
@@ -142,14 +156,26 @@ class ProductsController extends BaseController
                   ->sum('qte');
                  
                   $item['quantity'] = $product_warehouse_total_qty .' '.$product['unit']->ShortName;
-                  $item['total_amount'] = number_format($product_variant->price * $product_warehouse_total_qty, 2, '.', ',');
+                  
+                  // Calculate totals for variant products (use last variant for calculations)
+                  $total_cost = $product_variant->cost * $product_warehouse_total_qty;
+                  $total_amount = $product_variant->price * $product_warehouse_total_qty;
+                  $total_profit = ($product_variant->price - $product_variant->cost) * $product_warehouse_total_qty;
+                  
+                  $item['total_cost'] = number_format($total_cost, 2, '.', '');
+                  $item['total_amount'] = number_format($total_amount, 2, '.', '');
+                  $item['total_profit'] = number_format($total_profit, 2, '.', '');
 
             }else{
                   $item['name'] = $product->name;
                   $item['cost'] = '----';
                   $item['quantity'] = '----';
+                  $item['benefice'] = '----';
+                  $item['total_cost'] = '----';
+                  $item['total_profit'] = '----';
 
-                  $item['price'] = number_format($product->price, 2, '.', ',');
+                  $item['price'] = number_format($product->price, 2, '.', '');
+                  $item['total_amount'] = '----';
             }
 
 
@@ -167,12 +193,14 @@ class ProductsController extends BaseController
 
         $categories = Category::where('deleted_at', null)->get(['id', 'name']);
         $brands = Brand::where('deleted_at', null)->get(['id', 'name']);
+        $products_list = Product::where('deleted_at', null)->get(['id', 'name']);
 
         return response()->json([
             'warehouses' => $warehouses,
             'categories' => $categories,
             'brands' => $brands,
             'products' => $data,
+            'products_list' => $products_list,
             'totalRows' => $totalRows,
         ]);
     }
@@ -447,23 +475,7 @@ class ProductsController extends BaseController
                 }
 
                 $Product->image = $filename;
-                $Product->save();
-
-               // Store Variants Product
-               if ($request['type'] == 'is_variant') {
-                    $variants = json_decode($request->variants);
-
-                    foreach ($variants as $variant) {
-                        $Product_variants_data[] = [
-                            'product_id' => $Product->id,
-                            'name'  => $variant->text,
-                            'cost'  => $variant->cost,
-                            'price' => $variant->price,
-                            'code'  => $variant->code,
-                        ];
-                    }
-                    ProductVariant::insert($Product_variants_data);
-                }
+                $Product->save();               
 
                 //--Store Product Warehouse
                 $warehouses = Warehouse::where('deleted_at', null)->pluck('id')->toArray();
@@ -491,6 +503,37 @@ class ProductsController extends BaseController
                         }
                     }
                     product_warehouse::insert($product_warehouse);
+                }
+
+                // Handle warehouse-specific pricing if provided (this will override the defaults above)
+                if ($request->has('warehouse_pricing') && $request['warehouse_pricing']) {
+                    $warehouse_pricing = json_decode($request['warehouse_pricing'], true);
+                    
+                    foreach ($warehouse_pricing as $warehouse_id => $pricing) {
+                        // Update warehouse-specific pricing for single products
+                        if ($request['type'] == 'is_single' || $request['type'] == 'is_service') {
+                            $this->updateWarehousePricingWithHistory(
+                                $Product->id, 
+                                $warehouse_id, 
+                                null, // product_variant_id
+                                $pricing,
+                                'Product_create'
+                            );
+                        }
+                        
+                        // Handle variant pricing if needed
+                        if (isset($pricing['variants']) && is_array($pricing['variants'])) {
+                            foreach ($pricing['variants'] as $variant_id => $variant_pricing) {
+                                $this->updateWarehousePricingWithHistory(
+                                    $Product->id, 
+                                    $warehouse_id, 
+                                    $variant_id,
+                                    $variant_pricing,
+                                    'Product_create'
+                                );
+                            }
+                        }
+                    }
                 }
 
             }, 10);
@@ -742,10 +785,96 @@ class ProductsController extends BaseController
 
                 }
 
-
-            
                 $Product->is_imei = $request['is_imei'] == 'true' ? 1 : 0;
                 $Product->not_selling = $request['not_selling'] == 'true' ? 1 : 0;
+
+                // Handle warehouse-specific pricing
+                if ($request->has('warehouse_pricing') && $request['warehouse_pricing']) {
+                    $warehouse_pricing = json_decode($request['warehouse_pricing'], true);
+                    
+                    // If a specific warehouse is selected, only update that warehouse
+                    if ($request->has('selected_warehouse') && $request['selected_warehouse']) {
+                        $selected_warehouse_id = $request['selected_warehouse'];
+                        
+                        if (isset($warehouse_pricing[$selected_warehouse_id])) {
+                            $pricing = $warehouse_pricing[$selected_warehouse_id];
+                            
+                            // Update warehouse-specific pricing for single products
+                            if ($request['type'] == 'is_single' || $request['type'] == 'is_service') {
+                                $this->updateWarehousePricingWithHistory(
+                                    $id, 
+                                    $selected_warehouse_id, 
+                                    null, // product_variant_id
+                                    $pricing,
+                                    'Product_edit'
+                                );
+                            }
+                            
+                            // Handle variant pricing if needed
+                            if (isset($pricing['variants']) && is_array($pricing['variants'])) {
+                                foreach ($pricing['variants'] as $variant_id => $variant_pricing) {
+                                    $this->updateWarehousePricingWithHistory(
+                                        $id, 
+                                        $selected_warehouse_id, 
+                                        $variant_id,
+                                        $variant_pricing,
+                                        'Product_edit'
+                                    );
+                                }
+                            }
+                        }
+                    } else {
+                        // If no specific warehouse is selected, update all warehouses in the pricing data
+                        foreach ($warehouse_pricing as $warehouse_id => $pricing) {
+                            // Update warehouse-specific pricing for single products
+                            if ($request['type'] == 'is_single' || $request['type'] == 'is_service') {
+                                $this->updateWarehousePricingWithHistory(
+                                    $id, 
+                                    $warehouse_id, 
+                                    null, // product_variant_id
+                                    $pricing,
+                                    'Product_edit'
+                                );
+                            }
+                            
+                            // Handle variant pricing if needed
+                            if (isset($pricing['variants']) && is_array($pricing['variants'])) {
+                                foreach ($pricing['variants'] as $variant_id => $variant_pricing) {
+                                    $this->updateWarehousePricingWithHistory(
+                                        $id, 
+                                        $warehouse_id, 
+                                        $variant_id,
+                                        $variant_pricing,
+                                        'Product_edit'
+                                    );
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // If warehouse_pricing is not provided, but we have a current_warehouse_id from the list context,
+                    // update the warehouse-specific pricing for that warehouse
+                    if ($request->has('current_warehouse_id') && $request['current_warehouse_id'] && 
+                        ($request['type'] == 'is_single' || $request['type'] == 'is_service')) {
+                        
+                        $pricing = [];
+                        if ($request['type'] == 'is_single') {
+                            $pricing['price'] = $request['price'];
+                            $pricing['cost'] = $request['cost'];
+                        } else {
+                            $pricing['price'] = $request['price'];
+                            $pricing['cost'] = 0;
+                        }
+                        
+                        $this->updateWarehousePricingWithHistory(
+                            $id, 
+                            $request['current_warehouse_id'], 
+                            null, // product_variant_id
+                            $pricing,
+                            'Product_edit_from_list'
+                        );
+                    }
+                }
                 
                 // Store Variants Product
                 $oldVariants = ProductVariant::where('product_id', $id)
@@ -1210,8 +1339,8 @@ class ProductsController extends BaseController
                 $item['name'] = '['.$product_warehouse['productVariant']->name . ']' . $product_warehouse['product']->name;
                 $item['barcode'] = $product_warehouse['productVariant']->code;
 
-
-                $product_price = $product_warehouse['productVariant']->price;
+                // Use warehouse-specific price if available, otherwise use variant price
+                $product_price = $product_warehouse->price ?: $product_warehouse['productVariant']->price;
 
             } else {
                 $item['product_variant_id'] = null;
@@ -1220,7 +1349,8 @@ class ProductsController extends BaseController
                 $item['name'] = $product_warehouse['product']->name;
                 $item['barcode'] = $product_warehouse['product']->code;
 
-                $product_price =  $product_warehouse['product']->price;
+                // Use warehouse-specific price if available, otherwise use global product price
+                $product_price = $product_warehouse->price ?: $product_warehouse['product']->price;
             }
 
             $item['id'] = $product_warehouse->product_id;
@@ -1289,7 +1419,7 @@ class ProductsController extends BaseController
     
     
     //------------ Get product By ID -----------------\\
-    public function show_product_data($id , $variant_id)
+    public function show_product_data($id , $variant_id, $warehouse_id = null)
     {
 
         $Product_data = Product::with('unit')
@@ -1318,10 +1448,28 @@ class ProductsController extends BaseController
         $item['is_imei']     = $Product_data['is_imei'];
         $item['not_selling'] = $Product_data['not_selling'];
 
+        // Get warehouse-specific pricing if warehouse_id is provided
+        $warehouse_pricing = null;
+        if ($warehouse_id) {
+            $query = product_warehouse::where('warehouse_id', $warehouse_id)
+                ->where('product_id', $id)
+                ->where('deleted_at', null);
+            
+            if ($variant_id && $variant_id !== 'null') {
+                $query->where('product_variant_id', $variant_id);
+            } else {
+                $query->whereNull('product_variant_id');
+            }
+            
+            $warehouse_pricing = $query->first();
+        }
+
+
         //product single
         if($Product_data['type'] == 'is_single'){
-            $product_price = $Product_data['price'];
-            $product_cost  = $Product_data['cost'];
+            // Use warehouse-specific price if available, otherwise use global price
+            $product_price = $warehouse_pricing && $warehouse_pricing->price ? $warehouse_pricing->price : $Product_data['price'];
+            $product_cost  = $warehouse_pricing && $warehouse_pricing->cost ? $warehouse_pricing->cost : $Product_data['cost'];
 
             $item['code'] = $Product_data['code'];
             $item['name'] = $Product_data['name'];
@@ -1332,15 +1480,16 @@ class ProductsController extends BaseController
             $product_variant_data = ProductVariant::where('product_id', $id)
             ->where('id', $variant_id)->first();
 
-            $product_price = $product_variant_data['price'];
-            $product_cost  = $product_variant_data['cost'];
+            // Use warehouse-specific price if available, otherwise use variant price
+            $product_price = $warehouse_pricing ? $warehouse_pricing->price : $product_variant_data['price'];
+            $product_cost  = $warehouse_pricing ? $warehouse_pricing->cost : $product_variant_data['cost'];
             $item['code'] = $product_variant_data['code'];
             $item['name'] = '['.$product_variant_data['name'].']'.$Product_data['name'];
 
          //product is_service
         }else{
-
-            $product_price = $Product_data['price'];
+            // Use warehouse-specific price if available, otherwise use global price
+            $product_price = $warehouse_pricing ? $warehouse_pricing->price : $Product_data['price'];
             $product_cost  = 0;
 
             $item['code'] = $Product_data['code'];
@@ -1645,12 +1794,49 @@ class ProductsController extends BaseController
             ->where('base_unit', null)
             ->get();
 
+        //get warehouses assigned to user
+        $user_auth = auth()->user();
+        if($user_auth->is_all_warehouses){
+            $warehouses = Warehouse::where('deleted_at', '=', null)->get(['id', 'name']);
+        }else{
+            $warehouses_id = UserWarehouse::where('user_id', $user_auth->id)->pluck('warehouse_id')->toArray();
+            $warehouses = Warehouse::where('deleted_at', '=', null)->whereIn('id', $warehouses_id)->get(['id', 'name']);
+        }
+
+        // Get warehouse-specific pricing
+        $warehouse_pricing = [];
+        $product_warehouses = product_warehouse::where('product_id', $id)
+            ->where('deleted_at', null)
+            ->whereNotNull('price')
+            ->get();
+
+        foreach ($product_warehouses as $pw) {
+            if ($pw->product_variant_id) {
+                // For variant products, group by variant
+                if (!isset($warehouse_pricing[$pw->warehouse_id])) {
+                    $warehouse_pricing[$pw->warehouse_id] = [];
+                }
+                $warehouse_pricing[$pw->warehouse_id]['variants'][$pw->product_variant_id] = [
+                    'price' => $pw->price,
+                    'cost' => $pw->cost
+                ];
+            } else {
+                // For single products
+                $warehouse_pricing[$pw->warehouse_id] = [
+                    'price' => $pw->price,
+                    'cost' => $pw->cost
+                ];
+            }
+        }
+
         return response()->json([
             'product' => $data,
             'categories' => $categories,
             'brands' => $brands,
             'units' => $units,
             'units_sub' => $product_units,
+            'warehouses' => $warehouses,
+            'warehouse_pricing' => $warehouse_pricing,
         ]);
 
     }
@@ -1964,24 +2150,115 @@ class ProductsController extends BaseController
  
     }
  
-    public function getAverageCost($productId, $warehouseId)
+    public function getCostWarehouse($productId, $warehouseId)
     {
-        return PurchaseDetail::where('product_id', $productId)
-            ->whereHas('purchase', function ($query) use ($warehouseId) {
-                $query->where('warehouse_id', $warehouseId);
-            })
-            ->avg('cost') ?? 0;
+        $product = Product::find($productId);
+        
+        if (!$product) {
+            return 0;
+        }
+        
+        // Get the warehouse-specific cost for this product in this warehouse
+        $product_warehouse = product_warehouse::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->whereNull('product_variant_id')
+            ->first();
+            
+        // If we have a warehouse record and cost is explicitly set (not null), use it
+        // Even if it's 0, because 0 could be a valid warehouse-specific cost
+        if ($product_warehouse && $product_warehouse->cost !== null) {
+            return $product_warehouse->cost;
+        }
+        
+        // If no warehouse-specific cost or cost is null, fall back to global product cost
+        return $product->cost ?: 0;
     }
 
-    public function getAveragePrice($productId, $warehouseId)
+    public function getPriceWarehouse($productId, $warehouseId)
     {
-        return SaleDetail::where('product_id', $productId)
-            ->whereHas('sale', function ($query) use ($warehouseId) {
-                $query->where('warehouse_id', $warehouseId);
-            })
-            ->avg('price') ?? 0;
+        $product = Product::find($productId);
+        
+        if (!$product) {
+            return 0;
+        }
+        
+        // Get the warehouse-specific price for this product in this warehouse
+        $product_warehouse = product_warehouse::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->whereNull('product_variant_id')
+            ->first();
+            
+        // If we have a warehouse record and price is explicitly set (not null), use it
+        // Even if it's 0, because 0 could be a valid warehouse-specific price
+        if ($product_warehouse && $product_warehouse->price !== null) {
+            return $product_warehouse->price;
+        }
+        
+        // If no warehouse-specific price or price is null, fall back to global product price
+        return $product->price ?: 0;
     }
 
-
+    /**
+     * Update warehouse pricing with history logging
+     */
+    private function updateWarehousePricingWithHistory($productId, $warehouseId, $productVariantId, $pricing, $reason = null)
+    {
+        // Get the current pricing record
+        $query = product_warehouse::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId);
+            
+        if ($productVariantId) {
+            $query->where('product_variant_id', $productVariantId);
+        } else {
+            $query->whereNull('product_variant_id');
+        }
+        
+        $productWarehouse = $query->first();
+        
+        if (!$productWarehouse) {
+            // If no record exists, we can't log history, just return
+            return;
+        }
+        
+        $oldPrice = $productWarehouse->price;
+        $oldCost = $productWarehouse->cost;
+        $changeType = [];
+        
+        $newPrice = isset($pricing['price']) ? $pricing['price'] : $oldPrice;
+        $newCost = isset($pricing['cost']) ? $pricing['cost'] : $oldCost;
+        
+        // Check if price changed
+        if (isset($pricing['price']) && $pricing['price'] != $oldPrice) {
+            $changeType[] = 'price';
+        }
+        
+        // Check if cost changed
+        if (isset($pricing['cost']) && $pricing['cost'] != $oldCost) {
+            $changeType[] = 'cost';
+        }
+        
+        // Only update and log if there are actual changes
+        if (!empty($changeType)) {
+            // Update the pricing
+            $productWarehouse->update([
+                'price' => $newPrice,
+                'cost' => $newCost,
+            ]);
+            
+            // Log the change in history
+            ProductWarehousePriceHistory::create([
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId,
+                'product_variant_id' => $productVariantId,
+                'old_price' => in_array('price', $changeType) ? $oldPrice : null,
+                'new_price' => in_array('price', $changeType) ? $newPrice : null,
+                'old_cost' => in_array('cost', $changeType) ? $oldCost : null,
+                'new_cost' => in_array('cost', $changeType) ? $newCost : null,
+                'change_type' => implode(',', $changeType),
+                'reason' => $reason,
+                'changed_by' => Auth::id(),
+            ]);
+        }
+    }
 
 }

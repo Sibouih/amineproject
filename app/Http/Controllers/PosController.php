@@ -934,7 +934,8 @@ class PosController extends BaseController
                 $item['code'] = $productsVariants->code;
                 $item['barcode'] = $productsVariants->code;
 
-                $product_price = $product_warehouse['productVariant']->price;
+                // Use warehouse-specific price if available, otherwise use variant price
+                $product_price = $product_warehouse->price ?: $product_warehouse['productVariant']->price;
 
             } else {
                 $item['product_variant_id'] = null;
@@ -943,7 +944,8 @@ class PosController extends BaseController
                 $item['name'] = $product_warehouse['product']->name;
                 $item['barcode'] = $product_warehouse['product']->code;
 
-                $product_price =  $product_warehouse['product']->price;
+                // Use warehouse-specific price if available, otherwise use global product price
+                $product_price = $product_warehouse->price ?: $product_warehouse['product']->price;
 
             }
             $item['id'] = $product_warehouse->product_id;

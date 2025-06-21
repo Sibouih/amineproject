@@ -22,7 +22,7 @@
         <i class="i-File-Copy"></i> {{$t('Imprimer_en_PDF')}}
       </b-button>
 
-      <b-form-group :label="$t('warehouse')" class="mb-0 w-25">
+      <b-form-group :label="$t('warehouse')" class="mb-0 w-25 mx-2">
         <v-select
           @input="Selected_Warehouse"
           v-model="warehouse_id"
@@ -31,6 +31,21 @@
           :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
         />
       </b-form-group>
+
+      <b-form-group :label="$t('Filter_by_Product')" class="mb-0 w-25 mx-2">
+        <v-select
+          @input="Selected_Product"
+          v-model="product_id"
+          :reduce="label => label.value"
+          :placeholder="$t('All_Products')"
+          :options="all_products.map(product => ({label: product.display_name, value: product.id}))"
+          :clearable="true"
+        />
+      </b-form-group>
+
+      <b-button @click="clearFilters" size="sm" variant="outline-secondary ripple m-1">
+        <i class="i-Close"></i> {{$t('Clear_Filters')}}
+      </b-button>
     </div>
 
     <vue-good-table
@@ -55,6 +70,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
       styleClass="mt-5 table-hover tableOne vgt-table"
     >
@@ -104,10 +120,12 @@ export default {
       totalRows: "",
       products: [],
       warehouses: [],
+      all_products: [],
       rows: [{
         children: [],
       },],
       warehouse_id: "",
+      product_id: "",
       search_products:"",
       today_mode: true,
       startDate: "", 
@@ -327,6 +345,21 @@ export default {
       this.Get_products_report(1);
     },
 
+    //---------------------- Event Select Product ------------------------------\\
+    Selected_Product(value) {
+      if (value === null) {
+        this.product_id = "";
+      }
+      this.Get_products_report(1);
+    },
+
+    //---------------------- Clear Filters ------------------------------\\
+    clearFilters() {
+      this.warehouse_id = "";
+      this.product_id = "";
+      this.search_products = "";
+      this.Get_products_report(1);
+    },
 
     //----------------------------- Get_products_report------------------\\
     Get_products_report(page) {
@@ -343,6 +376,8 @@ export default {
             this.limit +
             "&warehouse_id=" +
             this.warehouse_id +
+            "&product_id=" +
+            this.product_id +
             "&to=" +
             this.endDate +
             "&from=" +
@@ -355,6 +390,13 @@ export default {
           this.products = response.data.products;
           this.totalRows = response.data.totalRows;
           this.rows[0].children = this.products;
+
+          // Get all products for filter dropdown if available
+          if (response.data.all_products) {
+            this.all_products = response.data.all_products;
+            console.log('All products loaded for filter:', this.all_products.length);
+          }
+
           // Complete the animation of theprogress bar.
           NProgress.done();
           this.isLoading = false;

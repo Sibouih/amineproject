@@ -94,6 +94,7 @@
                         {label: '14 per sheet (4 * 1.33)', value: 'style14'},
                         {label: '12 per sheet (a4) (2.5 * 2.834)', value: 'style12'},
                         {label: '10 per sheet (4 * 2)', value: 'style10'},
+                        {label: '50 * 25mm ticket size', value: 'style50_25'},
                       ]"
               ></v-select>
             </b-form-group>
@@ -123,38 +124,42 @@
               <div class="barcode-row" v-if="ShowCard" id="print_barcode_label">
                 <div :class="class_type_page" v-for ="(k, i) in total_a4" :key="i">
                   <div class="barcode-item" :class="class_sheet"  v-for="(sheet, index) in sheets" :key="index" >
-                    <div class="head_barcode text-left" style=" padding-left: 10px;font-weight: bold; ">
-                      <span class="barcode-name">{{product.name}}</span>
-                      <span class="barcode-price">{{currentUser.currency}} {{product.Net_price}}</span>
+                    <div class="head_barcode text-center">
+                      <span class="barcode-name" :title="product.name">{{product.name}}</span>
                     </div>
-                    <barcode
-                      class="barcode"
-                      :format="product.Type_barcode"
-                      :value="product.barcode"
-                      textmargin="0"
-                      fontoptions="bold"
-                      fontSize= "15"
-                      height= "25"
-                      width= "1"
-                    ></barcode>
+                    <div class="barcode-container">
+                      <barcode
+                        class="barcode"
+                        fontSize= "12"
+                        :format="product.Type_barcode"
+                        :value="product.barcode"
+                        textmargin="2"
+                        fontoptions="bold"
+                        :height="class_sheet === 'style50_25' ? '25' : '25'"
+                        :width="class_sheet === 'style50_25' ? '1' : '1'"
+                        :background="'transparent'"
+                      ></barcode>
+                    </div>
                     </div>
                 </div>
                 <div :class="class_type_page"  v-if="rest > 0">
                   <div class="barcode-item" :class="class_sheet"  v-for="(sheet, index) in rest" :key="index" >
-                    <div class="head_barcode text-left" style=" padding-left: 10px;font-weight: bold; ">
-                      <span class="barcode-name">{{product.name}}</span>
-                      <span class="barcode-price">{{currentUser.currency}} {{product.Net_price}}</span>
+                    <div class="head_barcode text-center">
+                      <span class="barcode-name" :title="product.name">{{product.name}}</span>
                     </div>
-                    <barcode
-                      class="barcode"
-                      fontSize= "15"
-                      :format="product.Type_barcode"
-                      :value="product.barcode"
-                      textmargin="0"
-                      fontoptions="bold"
-                      height= "25"
-                      width= "1"
-                    ></barcode>
+                    <div class="barcode-container">
+                      <barcode
+                        class="barcode"
+                        fontSize= "12"
+                        :format="product.Type_barcode"
+                        :value="product.barcode"
+                        textmargin="2"
+                        fontoptions="bold"
+                        :height="class_sheet === 'style50_25' ? '25' : '25'"
+                        :width="class_sheet === 'style50_25' ? '1' : '1'"
+                        :background="'transparent'"
+                      ></barcode>
+                    </div>
                     </div>
                 </div>
               </div>
@@ -184,7 +189,7 @@ export default {
       barcode: {
         product_id: "",
         warehouse_id: "",
-        qte: 10
+        qte: 1
       },
       count: "",
       paper_size:"",
@@ -249,6 +254,10 @@ export default {
         this.sheets = 10;
         this.class_sheet = 'style10';
        this.class_type_page = 'barcode_non_a4';
+      }else if(value == 'style50_25'){
+        this.sheets = 1;
+        this.class_sheet = 'style50_25';
+        this.class_type_page = 'barcode_non_a4';
       }
      
       this.Per_Page();
@@ -357,7 +366,13 @@ export default {
       a.document.write(
         '<link rel="stylesheet" href="/assets_setup/css/print_label.css"><html>'
       );
-      a.document.write("<body >");
+      a.document.write("<body style='margin:0; padding:0;'>");
+      
+      // Add special meta tag for 50*25mm ticket size if needed
+      if (this.class_sheet === 'style50_25') {
+        a.document.write('<style>@page { size: 50mm 25mm; margin: 0mm; } .barcode-container { display: flex !important; height: 15mm !important; background: transparent !important; } .barcode { display: inline-block !important; background: transparent !important; } .barcode svg { height: auto !important; width: 100% !important; max-width: 40mm; background: transparent !important; } .barcode svg rect { fill: #000000; } .barcode-name { text-transform: uppercase; font-weight: bold; font-size: 14px; }</style>');
+      }
+      
       a.document.write(divContents);
       a.document.write("</body></html>");
       a.document.close();
@@ -365,8 +380,6 @@ export default {
       setTimeout(() => {
          a.print();
       }, 1000);
-
-      
     },
    
     //-------------------------------------- Show Barcode -------------------------\\
@@ -402,8 +415,8 @@ export default {
       this.product.name = "";
       this.product.code = "";
       this.product.Net_price = "";
-      this.barcode.qte = 10;
-      this.count = 10;
+      this.barcode.qte = 1;
+      this.count = 1;
       this.barcode.warehouse_id = "";
       this.search_input= '';
       this.$refs.product_autocomplete.value = "";

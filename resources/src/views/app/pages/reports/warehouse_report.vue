@@ -81,6 +81,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="order-table vgt-table mt-2"
               >
@@ -127,6 +128,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="order-table vgt-table mt-2"
               >
@@ -206,6 +208,7 @@
                     mode: 'records',
                     nextLabel: 'next',
                     prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                   }"
                 @on-search="onSearch_Return_Sale"
                 :search-options="{
@@ -271,6 +274,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 @on-search="onSearch_Return_Purchase"
                 :search-options="{
@@ -336,6 +340,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 @on-search="onSearch_Expense"
                 :search-options="{

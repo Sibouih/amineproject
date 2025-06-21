@@ -876,20 +876,45 @@ class SalesController extends BaseController
             $this->authorizeForUser($request->user('api'), 'check_record', $sale_data);
         }
 
-        $sales['total_amount'] = DB::table('sales')
+        $paid_return = SaleReturn::where('sale_id', $id)->where('deleted_at', '=', null)->sum('paid_amount');
+
+        // Get all previous and current sales for this client up to this sale's date
+        $sales_total = DB::table('sales')
             ->where('deleted_at', '=', null)
             ->where('statut', 'completed')
             ->where('client_id', $sale_data['client']->id)
+            ->where('date', '<=', $sale_data->date)
+            ->where('id', '<=', $id)  // Include current and previous sales only
             ->sum('GrandTotal');
 
-        $sales['total_paid'] = DB::table('sales')
+        $sales_paid = DB::table('sales')
             ->where('deleted_at', '=', null)
             ->where('statut', 'completed')
+            ->where('client_id', $sale_data['client']->id)
+            ->where('date', '<=', $sale_data->date)
+            ->where('id', '<=', $id)  // Include current and previous sales only
+            ->sum('paid_amount');
+
+        $returns_paid = DB::table('sale_returns')
+            ->where('deleted_at', '=', null)
             ->where('client_id', $sale_data['client']->id)
             ->sum('paid_amount');
 
-        $sales['due'] = $sales['total_amount'] - $sales['total_paid'];
-        $total_credit = $sale_data['client']->credit_initial + $sales['due'];
+        $client_credit_initial = $sale_data['client']->credit_initial;   
+        // dump('$sales_total', $sales_total);
+        // dump('$sales_paid', $sales_paid);
+        // dump('$returns_paid', $returns_paid);
+        // dump('$sale_data->GrandTotal', $sale_data->GrandTotal);
+        // dump('$client_credit_initial', $client_credit_initial);
+
+        // Calculate due amount for all sales up to and including the current one
+        $sale_due = $sales_total - $sales_paid - $returns_paid - $sale_data->GrandTotal + $client_credit_initial;
+        
+        // Get client's credit initial value
+        $total_credit = $sale_due + $sale_data->GrandTotal;
+
+        // Convert the total amount to words using ArPHP library
+        $total_in_words = $this->convertNumberToWords($sale_data->GrandTotal);
 
         $sale_details['Ref'] = $sale_data->Ref;
         $sale_details['date'] = $sale_data->date;
@@ -907,9 +932,10 @@ class SalesController extends BaseController
         $sale_details['client_tax'] = $sale_data['client']->tax_number;
         $sale_details['GrandTotal'] = number_format($sale_data->GrandTotal, 2, '.', '');
         $sale_details['paid_amount'] = number_format($sale_data->paid_amount, 2, '.', '');
-        $sale_details['due'] = number_format($sale_details['GrandTotal'] - $sale_details['paid_amount'], 2, '.', '');
+        $sale_details['due'] = number_format($sale_due, 2, '.', '');
         $sale_details['total_credit'] = number_format($total_credit, 2, '.', '');
         $sale_details['payment_status'] = $sale_data->payment_statut;
+        $sale_details['total_in_words'] = $total_in_words;
 
         if (SaleReturn::where('sale_id', $id)->where('deleted_at', '=', null)->exists()) {
             $sellReturn = SaleReturn::where('sale_id', $id)->where('deleted_at', '=', null)->first();
@@ -1949,5 +1975,42 @@ class SalesController extends BaseController
          
      }
 
+    /**
+     * Convert a number to its text representation in Arabic
+     * 
+     * @param float $number
+     * @return string
+     */
+    private function convertNumberToWords($number)
+    {
+        // Initialize the Arabic numbers-to-text converter
+        $Arabic = new Arabic();
+        
+        // Split number into integer and decimal parts
+        $parts = explode('.', (string) $number);
+        $integer = intval($parts[0]);
+        $decimal = isset($parts[1]) ? intval($parts[1]) : 0;
+        
+        // Convert integer part to words
+        $integer_text = $Arabic->int2str($integer);
+        
+        // Add the currency name
+        $currency = Setting::where('deleted_at', '=', null)->first();
+        $currency_name = $currency->Currency->symbol;
+        
+        // Format the text output
+        $text = $integer_text . ' ' . 'درهم';
+        
+        // Add decimal part if exists
+        if ($decimal > 0) {
+            if ($decimal < 10) {
+                $decimal *= 10; // Convert single digit decimal to proper format (e.g. 0.5 -> 50 cents)
+            }
+            $decimal_text = $Arabic->int2str($decimal);
+            $text .= ' و ' . $decimal_text . ' سنتيم';
+        }
+        
+        return $text;
+    }
 
 }

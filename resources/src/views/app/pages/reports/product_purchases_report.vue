@@ -41,6 +41,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
         :styleClass="showDropdown?'tableOne table-hover vgt-table full-height':'tableOne table-hover vgt-table non-height'"
       >
@@ -98,6 +99,17 @@
             </b-form-group>
           </b-col>
 
+          <!-- Product  -->
+          <b-col md="12">
+            <b-form-group :label="$t('Product')">
+              <v-select
+                :reduce="label => label.value"
+                :placeholder="$t('Choose_Product')"
+                v-model="Filter_Product"
+                :options="products.map(products => ({label: products.name, value: products.id}))"
+              />
+            </b-form-group>
+          </b-col>
 
           <b-col md="6" sm="12">
             <b-button
@@ -178,8 +190,10 @@ export default {
       showDropdown: false,
       Filter_Supplier: "",
       Filter_warehouse: "",
+      Filter_Product: "",
       suppliers: [],
       warehouses: [],
+      products: [],
       purchases: [],
       limit: "10",
       today_mode: true,
@@ -341,6 +355,7 @@ export default {
       this.search = "";
       this.Filter_Supplier = "";
       this.Filter_warehouse = "";
+      this.Filter_Product = "";
       this.Get_Purchases(this.serverParams.page);
     },
 
@@ -387,6 +402,8 @@ export default {
         this.Filter_Supplier = "";
       } else if (this.Filter_warehouse === null) {
         this.Filter_warehouse = "";
+      } else if (this.Filter_Product === null) {
+        this.Filter_Product = "";
       } 
     },
 
@@ -431,6 +448,8 @@ export default {
             this.Filter_Supplier +
             "&warehouse_id=" +
             this.Filter_warehouse +
+            "&product_id=" +
+            this.Filter_Product +
             "&SortField=" +
             this.serverParams.sort.field +
             "&SortType=" +
@@ -448,6 +467,7 @@ export default {
           this.purchases = response.data.purchases;
           this.suppliers = response.data.suppliers;
           this.warehouses = response.data.warehouses;
+          this.products = response.data.products;
           this.totalRows = response.data.totalRows;
            this.rows[0].children = this.purchases;
           // Complete the animation of theprogress bar.

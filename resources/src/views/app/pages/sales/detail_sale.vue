@@ -16,19 +16,10 @@
             <i class="i-Edit"></i>
             <span>{{$t('EditSale')}}</span>
           </router-link>
-
-          <button @click="Send_Email()" class="btn btn-info btn-icon ripple btn-sm">
-            <i class="i-Envelope-2"></i>
-            {{$t('Email')}}
-          </button>
            <button @click="Sale_SMS()" class="btn btn-secondary btn-icon ripple btn-sm">
             <i class="i-Speach-Bubble"></i>
             SMS
-          </button>
-          <button @click="Sale_PDF()" class="btn btn-primary btn-icon ripple btn-sm">
-            <i class="i-File-TXT"></i>
-            PDF
-          </button>
+          </button>          
           <button @click="print()" class="btn btn-warning btn-icon ripple btn-sm">
             <i class="i-Billing"></i>
             {{$t('print')}}
@@ -45,147 +36,95 @@
       </b-row>
       <div class="invoice" id="print_Invoice">
         <div class="invoice-print">
-          <b-row class="justify-content-md-center">
-            <h4 class="font-weight-bold">{{$t('SaleDetail')}} : {{sale.Ref}}</h4>
-          </b-row>
-          <hr>
-          <b-row class="mt-5">
-            <b-col lg="4" md="4" sm="12" class="mb-4">
-              <h5 class="font-weight-bold">{{$t('Customer_Info')}}</h5>
-              <div>{{sale.client_name}}</div>
-              <div>{{sale.client_email}}</div>
-              <div>{{sale.client_phone}}</div>
-              <div>{{sale.client_adr}}</div>
-            </b-col>
-            <b-col lg="4" md="4" sm="12" class="mb-4">
-              <h5 class="font-weight-bold">{{$t('Company_Info')}}</h5>
-              <div>{{company.CompanyName}}</div>
-              <div>{{company.email}}</div>
-              <div>{{company.CompanyPhone}}</div>
-              <div>{{company.CompanyAdress}}</div>
-            </b-col>
-            <b-col lg="4" md="4" sm="12" class="mb-4">
-              <h5 class="font-weight-bold">{{$t('Invoice_Info')}}</h5>
-              <div>{{$t('Reference')}} : {{sale.Ref}}</div>
-              <div>
-                {{$t('PaymentStatus')}} :
-                <span
-                  v-if="sale.payment_status == 'paid'"
-                  class="badge badge-outline-success"
-                >{{$t('Paid')}}</span>
-                <span
-                  v-else-if="sale.payment_status == 'partial'"
-                  class="badge badge-outline-primary"
-                >{{$t('partial')}}</span>
-                <span v-else class="badge badge-outline-warning">{{$t('Unpaid')}}</span>
-              </div>
-              <div>{{$t('warehouse')}} : {{sale.warehouse}}</div>
-              <div>
-                {{$t('Status')}} :
-                <span
-                  v-if="sale.statut == 'completed'"
-                  class="badge badge-outline-success"
-                >{{$t('complete')}}</span>
-                <span
-                  v-else-if="sale.statut == 'pending'"
-                  class="badge badge-outline-info"
-                >{{$t('Pending')}}</span>
-                <span v-else class="badge badge-outline-warning">{{$t('Ordered')}}</span>
-              </div>
-            </b-col>
-          </b-row>
-          <b-row class="mt-3">
-            <b-col md="12">
-              <h5 class="font-weight-bold">{{$t('Order_Summary')}}</h5>
-              <div class="table-responsive">
-                <table class="table table-hover table-md">
-                  <thead class="bg-gray-300">
-                    <tr>
-                      <th scope="col">{{$t('ProductName')}}</th>
-                      <th scope="col">{{$t('Net_Unit_Price')}}</th>
-                      <th scope="col">{{$t('Quantity')}}</th>
-                      <th scope="col">{{$t('UnitPrice')}}</th>
-                      <th scope="col">{{$t('Discount')}}</th>
-                      <th scope="col">{{$t('SubTotal')}}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="detail in details">
-                      <td><span>{{detail.code}} ({{detail.name}})</span>
-                        <p v-show="detail.is_imei && detail.imei_number !==null ">{{$t('IMEI_SN')}} : {{detail.imei_number}}</p>
-                      </td>
-                      <td>{{currentUser.currency}} {{formatNumber(detail.Net_price,3)}}</td>
-                      <td>{{formatNumber(detail.quantity,2)}} {{detail.unit_sale}}</td>
-                      <td>{{currentUser.currency}} {{formatNumber(detail.price,2)}}</td>
-                      <td>{{currentUser.currency}} {{formatNumber(detail.DiscountNet,2)}}</td>
-                      <td>{{currentUser.currency}} {{detail.total.toFixed(2)}}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </b-col>
-            <div class="offset-md-9 col-md-3 mt-4">
-              <table class="table table-striped table-sm">
+          <!-- Company Header -->
+          <div class="text-center mb-4">
+            <h3 class="font-weight-bold">{{sale.warehouse}}</h3>
+            <hr style="border-top: 2px solid #000;">
+          </div>
+          
+          <!-- Invoice Header Info -->
+          <div class="d-flex justify-content-between mb-3">
+            <div>
+              <p><strong>{{$t('Invoice_num')}} </strong>: {{sale.Ref}}</p>
+              <p v-if="sale.date"><strong>{{$t('date')}}</strong>: {{sale.date}}</p>
+            </div>            
+          </div>
+          
+          <!-- Client Info -->
+          <div class="p-2 mb-3 border">
+            <div class="col-md-6">
+              <p class="m-0"><strong>{{$t('Client')}}</strong>: <strong>{{sale.client_name}}</strong></p>
+              <p v-if="sale.client_adr" class="m-0"><strong>{{$t('Address')}}</strong>: {{sale.client_adr}}</p>
+            </div>
+          </div>
+          
+          <!-- Products Table -->
+          <div class="table-responsive">
+            <table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th width="5%" class="text-center">N°</th>
+                  <th width="45%">{{$t('ProductName')}}</th>
+                  <th width="15%" class="text-center">{{$t('Qty')}}</th>
+                  <th width="15%" class="text-center">{{$t('Price')}}</th>
+                  <th width="20%" class="text-center">{{$t('Total')}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(detail, index) in details" :key="index">
+                  <td class="text-center">{{index + 1}}</td>
+                  <td>{{detail.name}}</td>
+                  <td class="text-center">{{formatNumber(detail.quantity, 2)}}</td>
+                  <td class="text-center">{{formatNumber(detail.price, 2)}}</td>
+                  <td class="text-center">{{detail.total.toFixed(2)}}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" class="text-right">
+                    <strong>{{$t('Number_of_Products')}}</strong>: {{details.length}}
+                  </td>
+                  <td colspan="2" class="text-right font-weight-bold">{{$t('Total')}}</td>
+                  <td class="text-center font-weight-bold">{{sale.GrandTotal}}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          
+          <!-- Total in Words -->
+          <div class="border p-2 mb-3">
+            <strong>{{$t('Total_in_Words')}}</strong>: {{sale.total_in_words}}
+          </div>
+          
+          <!-- Payment Information -->
+          <div class="row mt-4">            
+            <div class="col-md-6">
+              <table class="table table-bordered">
                 <tbody>
                   <tr>
-                    <td>{{$t('Discount')}}</td>
-                    <td>{{currentUser.currency}} {{sale.discount.toFixed(2)}}</td>
+                    <td><strong>{{$t('Total')}}</strong></td>
+                    <td class="text-center">{{sale.GrandTotal ? sale.GrandTotal :  '0.00'}}</td>
                   </tr>
                   <tr>
-                    <td>{{$t('Shipping')}}</td>
-                    <td>{{currentUser.currency}} {{sale.shipping.toFixed(2)}}</td>
+                    <td><strong>{{$t('Due')}}</strong></td>
+                    <td class="text-center">{{sale.due ? sale.due : '0.00'}}</td>
                   </tr>
                   <tr>
-                    <td>
-                      <span class="font-weight-bold">{{$t('Total')}}</span>
-                    </td>
-                    <td>
-                      <span
-                        class="font-weight-bold"
-                      >{{currentUser.currency}} {{sale.GrandTotal}}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <span class="font-weight-bold">{{$t('Paid')}}</span>
-                    </td>
-                    <td>
-                      <span
-                        class="font-weight-bold"
-                      >{{currentUser.currency}} {{sale.paid_amount}}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <span class="font-weight-bold">{{$t('Due')}}</span>
-                    </td>
-                    <td>
-                      <span
-                        class="font-weight-bold"
-                      >{{currentUser.currency}} {{sale.due}}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <span class="font-weight-bold">{{$t('Reste_credit')}}</span>
-                    </td>
-                    <td>
-                      <span
-                        
-                        class="font-weight-bold"
-                      >{{currentUser.currency}} {{sale.total_credit}}</span>
-                    </td>
+                    <td><strong>{{$t('Reste_credit')}}</strong></td>
+                    <td class="text-center">{{sale.total_credit ? sale.total_credit : '0.00'}}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </b-row>
+          </div>
+          <div class="thanks row mt-4 justify-content-center">
+            <p class="text-center">{{$t('Thank_You_For_Shopping_With_Us')}}</p>
+          </div>
+          
           <hr v-show="sale.note">
-          <b-row class="mt-4">
-           <b-col md="12">
-             <p>{{$t('sale_note')}} : {{sale.note}}</p>
-           </b-col>
-        </b-row>
+          <div v-show="sale.note" class="mt-3">
+            <p><strong>{{$t('Note')}}</strong>: {{sale.note}}</p>
+          </div>
         </div>
       </div>
     </b-card>
@@ -209,14 +148,7 @@ export default {
       sale: {},
       details: [],
       variants: [],
-      company: {},
-      email: {
-        to: "",
-        subject: "",
-        message: "",
-        client_name: "",
-        Sale_Ref: ""
-      }
+      invoiceDirection: "ltr"
     };
   },
 
@@ -278,7 +210,153 @@ export default {
 
     //------------------------------ Print -------------------------\\
     print() {
-      this.$htmlToPaper('print_Invoice');
+      // Create a new window
+      const printWindow = window.open('', '_blank');
+      
+      // Get the invoice content
+      const invoiceContent = document.getElementById('print_Invoice').innerHTML;
+      
+      // Write a simple RTL document
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html dir="rtl">
+        <head>
+          <title>Invoice</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              direction: rtl;
+              text-align: right;
+              padding: 10mm;
+              margin: 0;
+              font-size: 12px;
+              background-color: white;
+            }
+            h3, h4 {
+              margin: 5px 0;
+            }
+            p {
+              margin: 5px 0;
+            }
+            [dir="ltr"] {
+              direction: ltr;
+              unicode-bidi: isolate;
+            }
+            .phone-number {
+              direction: ltr;
+              display: inline-block;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .text-left {
+              text-align: left;
+            }
+            .font-weight-bold {
+              font-weight: bold;
+            }
+            hr {
+              border-top: 1px solid #000;
+              margin: 5px 0;
+            }
+            .mb-4 {
+              margin-bottom: 15px;
+            }
+            .mb-3 {
+              margin-bottom: 10px;
+            }
+            .mt-2 {
+              margin-top: 10px;
+            }
+            .mt-3 {
+              margin-top: 10px;
+            }
+            .mt-4 {
+              margin-top: 15px;
+            }
+            .p-2 {
+              padding: 8px;
+            }
+            .p-3 {
+              padding: 10px;
+            }
+            .border {
+              border: 1px solid #000;
+            }
+            .row {
+              display: flex;
+              flex-wrap: wrap;
+            }
+            .col-md-6 {
+              flex: 0 0 50%;
+              max-width: 50%;
+              box-sizing: border-box;
+            }
+            .d-flex {
+              display: flex;
+            }
+            .justify-content-between {
+              justify-content: space-between;
+            }
+            .table-responsive {
+              width: 100%;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 10px;
+            }
+            table, th, td {
+              border: 1px solid #000;
+            }
+            th, td {
+              padding: 5px;
+              text-align: right;
+            }
+            thead {
+              background-color: #f5f5f5;
+            }
+            tfoot {
+              font-weight: bold;
+              background-color: #f9f9f9;
+            }
+            .thanks {
+              justify-content: center;
+            }
+            @media print {
+              body {
+                padding: 5mm;
+                font-size: 11px;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+              }
+              table, th, td {
+                border: 1px solid #000 !important;
+              }
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${invoiceContent}
+        </body>
+        </html>
+      `);
+      
+      // Close the document and focus on it
+      printWindow.document.close();
+      printWindow.focus();
+      
+      // Print after a short delay
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 1000);
     },
 
 

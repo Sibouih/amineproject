@@ -74,6 +74,8 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get("report/product_report", "ReportController@product_report");
     Route::get("report/sale_products_details", "ReportController@sale_products_details");
     Route::get("report/purchase_products_details", "ReportController@purchase_products_details");
+    Route::get("report/sale_returns_products_details", "ReportController@sale_returns_products_details");
+    Route::get("report/purchase_returns_products_details", "ReportController@purchase_returns_products_details");
     Route::get("report/product_sales_report", "ReportController@product_sales_report");
     Route::get("report/product_purchases_report", "ReportController@product_purchases_report");
 
@@ -101,6 +103,18 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get("report/inventory_valuation_summary", "ReportController@inventory_valuation_summary");
     Route::get("report/expenses_report", "ReportController@expenses_report");
     Route::get("report/deposits_report", "ReportController@deposits_report");
+
+    //-------------------- Get Payments By Clients -------------\\
+
+    Route::get("report/client_payments", "ReportController@Payments_Client");
+    Route::get("report/client_payments/{id}", "ReportController@Payment_Detail");
+    Route::get("report/client_payments/{id}/sale_payments", "ReportController@Sale_Payments_By_Client_Payment");
+    Route::get("report/client_quotations", "ReportController@Quotations_Client");
+    Route::get("report/direct_payments", "ReportController@Direct_Payments_Client");
+    Route::get("report/global_payments", "ReportController@Global_Payments_Client");
+    Route::get("report/global_client_payments", "ReportController@Global_Client_Payments");
+    Route::get("report/old_payment_detail/{id}", "ReportController@Old_Payment_Detail");
+    Route::get("report/client_payments_report", "ReportController@Client_Payments_Report");
 
     //------------------------------Employee------------------------------------\\
 
@@ -202,9 +216,14 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::post('clients_pay_due', 'ClientController@clients_pay_due');
     Route::post('clients_pay_return_due', 'ClientController@pay_sale_return_due');
     Route::get('get_client_store_data/{id}', 'ClientController@get_client_store_data');
+    Route::get('exportAllClients', 'ClientController@exportAllClients');
 
-
+    //------------------------------- CLIENT PAYMENTS --------------------------\\
+    //------------------------------------------------------------------\\
     
+    Route::resource('client_payments', 'ClientPaymentController');
+    Route::get('client_payment/{id}/details', 'ClientPaymentController@show');
+
     //------------------------------- CLIENTS Ecommerce--------------------------\\
     //------------------------------------------------------------------\\
 
@@ -245,7 +264,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get('get_products_stock_alerts', 'ProductsController@Products_Alert');
     Route::get('barcode_create_page', 'ProductsController@Get_element_barcode');
     Route::post('products/delete/by_selection', 'ProductsController@delete_by_selection');
-    Route::get('show_product_data/{id}/{variant_id}', 'ProductsController@show_product_data');
+    Route::get('show_product_data/{id}/{variant_id}/{warehouse_id?}', 'ProductsController@show_product_data');
 
 
      //---- count stock ----------
@@ -492,6 +511,15 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::post('update_status_module', 'ModuleSettingsController@update_status_module');
     Route::post('upload_module', 'ModuleSettingsController@upload_module');
 
+    //------------------------------- Warehouse Pricing Management ------------------------\\
+    //------------------------------------------------------------------\\
+
+    Route::get('warehouse-pricing', 'ProductWarehousePricingController@index');
+    Route::post('warehouse-pricing/update', 'ProductWarehousePricingController@updatePricing');
+    Route::post('warehouse-pricing/bulk-update', 'ProductWarehousePricingController@bulkUpdatePricing');
+    Route::get('warehouse-pricing/history', 'ProductWarehousePricingController@getPricingHistory');
+    Route::get('warehouse-pricing/warehouse-history', 'ProductWarehousePricingController@getWarehousePricingHistory');
+
 });
 
     //-------------------------------  Print & PDF ------------------------\\
@@ -513,3 +541,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
 
 
     Route::get('clients_export_all', 'ClientController@exportAllClients');
+
+    Route::get("report/old_payment_detail/{id}", "ReportController@Old_Payment_Detail");
+    Route::get("report/direct_payments", "ReportController@Direct_Payments_Client");
+    Route::get("report/global_payments", "ReportController@Global_Payments_Client");

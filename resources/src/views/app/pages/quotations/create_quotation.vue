@@ -1044,7 +1044,12 @@ export default {
     //---------------------------------Get Product Details ------------------------\\
 
     Get_Product_Details(product_id, variant_id) {
-      axios.get("/show_product_data/" + product_id +"/"+ variant_id).then(response => {
+      const warehouse_id = this.quote.warehouse_id || '';
+      const url = warehouse_id ? 
+        `/show_product_data/${product_id}/${variant_id}/${warehouse_id}` : 
+        `/show_product_data/${product_id}/${variant_id}`;
+        
+      axios.get(url).then(response => {
         this.product.discount = 0;
         this.product.DiscountNet = 0;
         this.product.discount_Method = "2";

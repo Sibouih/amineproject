@@ -382,6 +382,24 @@
               <span class="item-name">{{$t('Units')}}</span>
             </router-link>
           </li>
+          <li
+            class="nav-item"
+            v-if="currentUserPermissions && currentUserPermissions.includes('products_view')"
+          >
+            <router-link tag="a" class to="/app/products/warehouse-pricing">
+              <i class="nav-icon i-Dollar"></i>
+              <span class="item-name">{{$t('Warehouse_Pricing')}}</span>
+            </router-link>
+          </li>
+          <li
+            class="nav-item"
+            v-if="currentUserPermissions && currentUserPermissions.includes('products_view')"
+          >
+            <router-link tag="a" class to="/app/products/warehouse-pricing-history">
+              <i class="nav-icon i-Clock"></i>
+              <span class="item-name">{{$t('Pricing_History')}}</span>
+            </router-link>
+          </li>
         </ul>
 
         <ul
@@ -979,6 +997,14 @@
                 <router-link tag="a" class to="/app/reports/payments_sale">
                   <i class="nav-icon i-ID-Card"></i>
                   <span class="item-name">{{$t('Sales')}}</span>
+                </router-link>
+              </li>
+              <li
+                v-if="currentUserPermissions && currentUserPermissions.includes('Reports_payments_Sales')"
+              >
+                <router-link tag="a" class to="/app/reports/client_payments">
+                  <i class="nav-icon i-ID-Card"></i>
+                  <span class="item-name">{{$t('ClientPayments')}}</span>
                 </router-link>
               </li>
               <li

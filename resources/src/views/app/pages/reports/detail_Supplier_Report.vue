@@ -74,6 +74,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -135,6 +136,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -200,6 +202,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -258,6 +261,13 @@ export default {
     ...mapGetters(["currentUser"]),
     columns_purchases() {
       return [
+        {
+          label: this.$t("date"),
+          field: "date",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
         {
           label: this.$t("Reference"),
           field: "Ref",
@@ -323,6 +333,13 @@ export default {
     },
     columns_returns() {
       return [
+        {
+          label: this.$t("date"),
+          field: "date",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
         {
           label: this.$t("Reference"),
           field: "Ref",

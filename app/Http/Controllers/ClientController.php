@@ -15,9 +15,18 @@ use App\Models\SaleReturn;
 use App\Models\PaymentSaleReturns;
 use App\Models\Sale;
 use App\Models\PaymentSale;
-use DB;
+use App\Models\ClientPayment;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Stripe\Stripe;
+use App\Models\User;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\ClientImport;
+use App\Exports\ClientsExport;
+use App\Models\Role;
 
 class ClientController extends BaseController
 {
@@ -83,16 +92,27 @@ class ClientController extends BaseController
                 ->where('client_id', $client->id)
                 ->sum('paid_amount');
 
-            $item['due'] = $item['total_amount'] - $item['total_paid'];
+            $item['paid_sales'] = DB::table('payment_sales')
+                ->join('sales', 'payment_sales.sale_id', '=', 'sales.id')
+                ->where('payment_sales.deleted_at', '=', null)
+                ->where('sales.client_id', $client->id)
+                ->sum('payment_sales.montant');
+
+            $global_payments = DB::table('client_payments')
+                ->where('deleted_at', '=', null)
+                ->where('client_id', $client->id)
+                ->sum('montant');
+
+            $item['due'] = $item['total_amount'];
 
             $item['total_amount_return'] = DB::table('sale_returns')
                 ->where('deleted_at', '=', null)
-                ->where('client_id', $client->id)
-                ->sum('GrandTotal');
-
-            $item['total_paid_return'] = DB::table('sale_returns')
-                ->where('sale_returns.deleted_at', '=', null)
                 ->where('sale_returns.client_id', $client->id)
+                ->sum('GrandTotal');
+            
+            $item['total_paid_return'] = DB::table('sale_returns')
+                ->where('sale_returns.client_id', $client->id)
+                ->where('deleted_at',  '=', null)
                 ->sum('paid_amount');
 
             $item['return_Due'] = $item['total_amount_return'] - $item['total_paid_return'];
@@ -107,7 +127,7 @@ class ClientController extends BaseController
             $item['city'] = $client->city;
             $item['remise'] = $client->remise;
             $item['credit_initial'] = $client->credit_initial ?? 0;
-            $item['total_credit'] = $client->credit_initial + $item['due'] - $item['return_Due'];
+            $item['total_credit'] = $client->credit_initial + $item['due'] - ($item['total_paid_return'] + $item['paid_sales'] + $global_payments);
             $item['adresse'] = $client->adresse;
             $data[] = $item;
         }
@@ -329,91 +349,132 @@ class ClientController extends BaseController
     //------------- clients_pay_due -------------\\
 
     public function clients_pay_due(Request $request)
-     {
-         $this->authorizeForUser($request->user('api'), 'pay_due', Client::class);
+    {
+        $this->authorizeForUser($request->user('api'), 'pay_due', Client::class);
         
-         if($request['amount'] > 0){
-            $client_sales_due = Sale::where('deleted_at', '=', null)
-            ->where([
-                ['payment_statut', '!=', 'paid'],
-                ['client_id', $request->client_id]
-            ])->get();
+        if($request['amount'] > 0){
+            // Create a global client payment record first
+            $clientPayment = new ClientPayment();
+            $clientPayment->Ref = $this->getClientPaymentNumberOrder();
+            $clientPayment->client_id = $request->client_id;
+            $clientPayment->date = Carbon::now();
+            $clientPayment->Reglement = $request['Reglement'];
+            $clientPayment->montant = $request->amount;
+            $clientPayment->notes = $request['notes'];
+            $clientPayment->user_id = Auth::user()->id;
+            $clientPayment->account_id = $request['account_id'] ? $request['account_id'] : NULL;
+            $clientPayment->payment_status = 'processed';
+            $clientPayment->save();
+
+            // Update account balance if account_id is provided
+            if($request['account_id']){
+                $account = Account::find($request['account_id']);
+                if($account){
+                    $account->update([
+                        'balance' => $account->balance + $request->amount,
+                    ]);
+                }
+            }
 
             $client = Client::where('deleted_at', '=', null)->where('id', '=', $request->client_id)->first();
-
             $paid_amount_total = $request->amount;
-            if ($request->type == 'credit_initial_only' || $request->type == 'credit_initial_first') {
-                $paid_aux = $request->amount;
+
+            // Handle payment based on the type
+            if ($request->type == 'credit_initial_only') {
+                // Just apply to initial credit
                 if ($paid_amount_total > $client->credit_initial) {
-                    $paid_amount_total = $paid_amount_total - $client->credit_initial;
-                    $paid_aux = $client->credit_initial;
                     $client->credit_initial = 0;
-                }
-                else {
+                } else {
                     $client->credit_initial = $client->credit_initial - $paid_amount_total;
                 }
                 $client->save();
-                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
-            }
-
-            if ($request->type == 'credit_ventes_only' || $request->type == 'credit_initial_first' || $request->type == 'credit_ventes_first') {
-                foreach($client_sales_due as $key => $client_sale){
-                    if($paid_amount_total == 0)
-                    break;
-                    $due = $client_sale->GrandTotal  - $client_sale->paid_amount;
-
-                    if($paid_amount_total >= $due){
-                        $amount = $due;
-                        $payment_status = 'paid';
-                    }else{
-                        $amount = $paid_amount_total;
-                        $payment_status = 'partial';
+            } 
+            else if ($request->type == 'credit_ventes_only' || $request->type == 'credit_initial_first' || $request->type == 'credit_ventes_first') {
+                // Apply to sales if selected
+                if ($request->type == 'credit_initial_first') {
+                    // First handle the initial credit
+                    if ($paid_amount_total > $client->credit_initial) {
+                        $paid_amount_total = $paid_amount_total - $client->credit_initial;
+                        $client->credit_initial = 0;
+                    } else {
+                        $client->credit_initial = $client->credit_initial - $paid_amount_total;
+                        $paid_amount_total = 0;
                     }
-                    $this->createPayment($request, $client_sale, $amount, $payment_status);
-                    $paid_amount_total -= $amount;
+                    $client->save();
+                }
+
+                // Apply the rest to sales if there's still an amount to pay
+                if ($paid_amount_total > 0) {
+                    $client_sales_due = Sale::where('deleted_at', '=', null)
+                        ->where([
+                            ['payment_statut', '!=', 'paid'],
+                            ['client_id', $request->client_id]
+                        ])->get();
+
+                    foreach($client_sales_due as $key => $client_sale){
+                        if($paid_amount_total == 0)
+                            break;
+                        
+                        $due = $client_sale->GrandTotal - $client_sale->paid_amount;
+
+                        if($paid_amount_total >= $due){
+                            $amount = $due;
+                            $payment_status = 'paid';
+                        } else {
+                            $amount = $paid_amount_total;
+                            $payment_status = 'partial';
+                        }
+
+                        // Update the sale's paid amount directly
+                        $client_sale->paid_amount += $amount;
+                        $client_sale->payment_statut = $payment_status;
+                        $client_sale->save();
+
+                        $paid_amount_total -= $amount;
+                    }
+                }
+
+                // If amount still remains and we're handling credit_ventes_first, apply to initial credit
+                if ($paid_amount_total > 0 && $request->type == 'credit_ventes_first') {
+                    if ($paid_amount_total > $client->credit_initial) {
+                        $client->credit_initial = 0;
+                    } else {
+                        $client->credit_initial = $client->credit_initial - $paid_amount_total;
+                    }
+                    $client->save();
                 }
             }
-
-            if ($paid_amount_total > 0 && $request->type == 'credit_ventes_first') {
-                $paid_aux = $paid_amount_total;
-                if ($paid_amount_total > $client->credit_initial) {
-                    $paid_amount_total = $paid_amount_total - $client->credit_initial;
-                    $paid_aux = $client->credit_initial;
-                    $client->credit_initial = 0;
-                }
-                else {
-                    $client->credit_initial = $client->credit_initial - $paid_amount_total;
-                }
-                $client->save();
-                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
-            }
-            
         }
-         return response()->json(['success' => true]);
- 
-     }
-
-    protected function createPayment($request, $client_sale = null, $amount, $payment_status, $type = 'commande') {
-        $payment_sale = new PaymentSale();
-        if ($client_sale !== null) {
-            $payment_sale->sale_id = $client_sale->id;
-        }
-        $payment_sale->Ref = app('App\Http\Controllers\PaymentSalesController')->getNumberOrder();
-        $payment_sale->date = Carbon::now();
-        $payment_sale->Reglement = $request['Reglement'];
-        $payment_sale->montant = $amount;
-        $payment_sale->change = 0;
-        $payment_sale->notes = $request['notes'];
-        $payment_sale->user_id = Auth::user()->id;
-        $payment_sale->type_credit = $type;
-        $payment_sale->save();
-        if ($client_sale !== null) {
-            $client_sale->paid_amount += $amount;
-            $client_sale->payment_statut = $payment_status;
-            $client_sale->save();
-        }
+        return response()->json(['success' => true]);
     }
 
+    // Method to handle payments for individual sales (DEPRECATED - kept for reference only)
+    protected function createPayment($request, $client_sale = null, $amount, $payment_status, $type = 'commande', $client_payment_id = null) {
+        // This method is no longer used - payments should be recorded directly in client_payments table
+        // and sales/credits should be updated directly
+    }
+
+    //------------- Get Number Order Client Payment -------------\\
+
+    public function getClientPaymentNumberOrder()
+    {
+        $last = DB::table('client_payments')->latest('id')->first();
+
+        if ($last) {
+            $ref = $last->Ref;
+            if (preg_match('/INV\/SL_(\d+)/', $ref, $matches)) {
+                $number = (int)$matches[1];
+                $code = 'INV/SL_' . ($number + 1);
+            } else {
+                // If format doesn't match, start with 1
+                $code = 'INV/SL_1';
+            }
+        } else {
+            // If no previous payments, create initial reference
+            $code = 'INV/SL_1';
+        }
+        return $code;
+    }
 
     //------------- clients_pay_sale_return_due -------------\\
 
@@ -482,12 +543,47 @@ class ClientController extends BaseController
         $data = [];
 
         foreach ($clients as $client) {
+            // Calculate total amount from sales
+            $total_amount = DB::table('sales')
+                ->where('deleted_at', '=', null)
+                ->where('statut', 'completed')
+                ->where('client_id', $client->id)
+                ->sum('GrandTotal');
+
+            // Calculate total paid amount from sales
+            $total_paid = DB::table('sales')
+                ->where('deleted_at', '=', null)
+                ->where('statut', 'completed')
+                ->where('client_id', $client->id)
+                ->sum('paid_amount');
+
+            // Calculate due amount
+            $due = $total_amount - $total_paid;
+
+            // Calculate total amount from returns
+            $total_amount_return = DB::table('sale_returns')
+                ->where('deleted_at', '=', null)
+                ->where('client_id', $client->id)
+                ->sum('GrandTotal');
+            
+            // Calculate total paid from returns
+            $total_paid_return = DB::table('sale_returns')
+                ->where('client_id', $client->id)
+                ->where('deleted_at', '=', null)
+                ->sum('paid_amount');
+
+            // Calculate return due
+            $return_due = $total_amount_return - $total_paid_return;
+
+            // Calculate total credit (matches the formula in index method)
+            $total_credit = ($client->credit_initial ?? 0) + $due - $total_paid_return;
+
             $item = [
                 'id' => $client->id,
                 'name' => $client->name,
                 'phone' => $client->phone,
                 'city' => $client->city,
-                'total_credit' => ($client->credit_initial ?? 0) + ($client->due ?? 0) - ($client->return_Due ?? 0),
+                'total_credit' => $total_credit,
             ];
 
             $data[] = $item;

@@ -40,6 +40,7 @@
         mode: 'records',
         nextLabel: 'next',
         prevLabel: 'prev',
+        perPageDropdown: [10, 25, 50, 100, 250, 500],
       }"
         :styleClass="'mt-5 order-table vgt-table'"
       >
@@ -74,19 +75,7 @@
               class="badge badge-outline-info"
             >{{$t('Pending')}}</span>
             <span v-else class="badge badge-outline-warning">{{$t('Ordered')}}</span>
-          </div>
-
-          <div v-else-if="props.column.field == 'payment_status'">
-            <span
-              v-if="props.row.payment_status == 'paid'"
-              class="badge badge-outline-success"
-            >{{$t('Paid')}}</span>
-            <span
-              v-else-if="props.row.payment_status == 'partial'"
-              class="badge badge-outline-primary"
-            >{{$t('partial')}}</span>
-            <span v-else class="badge badge-outline-warning">{{$t('Unpaid')}}</span>
-          </div>
+          </div>          
         </template>
       </vue-good-table>
     </b-card>
@@ -136,19 +125,7 @@
                 <option value="ordered">Ordered</option>
               </select>
             </b-form-group>
-          </b-col>
-
-          <!-- Payment Status  -->
-          <b-col md="12">
-            <b-form-group :label="$t('PaymentStatus')">
-              <select v-model="Filter_Payment" type="text" class="form-control">
-                <option value selected>All</option>
-                <option value="paid">Paid</option>
-                <option value="partial">partial</option>
-                <option value="unpaid">UnPaid</option>
-              </select>
-            </b-form-group>
-          </b-col>
+          </b-col>          
 
           <b-col md="6" sm="12">
             <b-button @click="Get_Sales(serverParams.page)" variant="primary ripple m-1" size="sm" block>
@@ -174,7 +151,6 @@ import NProgress from "nprogress";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import DateRangePicker from 'vue2-daterange-picker'
-//you need to import the CSS manually
 import 'vue2-daterange-picker/dist/vue2-daterange-picker.css'
 import moment from 'moment'
 
@@ -276,30 +252,7 @@ components: { DateRangePicker },
           headerField: this.sumCount,
           tdClass: "text-left",
           thClass: "text-left"
-        },
-        {
-          label: this.$t("Paid"),
-          field: "paid_amount",
-          type: "decimal",
-          headerField: this.sumCount2,
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
-        {
-          label: this.$t("Due"),
-          field: "due",
-          type: "decimal",
-          headerField: this.sumCount3,
-          tdClass: "text-left",
-          thClass: "text-left"
-        },
-        {
-          label: this.$t("PaymentStatus"),
-          field: "payment_status",
-          html: true,
-          tdClass: "text-left",
-          thClass: "text-left"
-        }
+        },        
       ];
     }
   },
@@ -382,7 +335,6 @@ components: { DateRangePicker },
       this.search = "";
       this.Filter_Client = "";
       this.Filter_status = "";
-      this.Filter_Payment = "";
       this.Filter_Ref = "";
       this.Filter_warehouse = "";
       this.Get_Sales(this.serverParams.page);
@@ -413,9 +365,6 @@ components: { DateRangePicker },
         { title: "Warehouse", dataKey: "warehouse_name" },
         { title: "Status", dataKey: "statut" },
         { title: "Total", dataKey: "GrandTotal" },
-        { title: "Paid", dataKey: "paid_amount" },
-        { title: "Due", dataKey: "due" },
-        { title: "Status Payment", dataKey: "payment_status" }
       ];
       pdf.autoTable(columns, self.sales);
       pdf.text("Sales report", 40, 25);
@@ -444,14 +393,19 @@ components: { DateRangePicker },
     get_data_loaded() {
       var self = this;
       if (self.today_mode) {
-        let startDate = new Date("01/01/2000");  // Set start date to "01/01/2000"
-        let endDate = new Date();  // Set end date to current date
+        // Get first day of current month
+        let startDate = new Date();
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+        
+        // Get current date as end date
+        let endDate = new Date();
 
-        self.startDate = startDate.toISOString();
-        self.endDate = endDate.toISOString();
+        self.startDate = startDate.toISOString().slice(0, 10);
+        self.endDate = endDate.toISOString().slice(0, 10);
 
-        self.dateRange.startDate = startDate.toISOString();
-        self.dateRange.endDate = endDate.toISOString();
+        self.dateRange.startDate = startDate;
+        self.dateRange.endDate = endDate;
       }
     },
 
@@ -461,6 +415,7 @@ components: { DateRangePicker },
       // Start the progress bar.
       NProgress.start();
       NProgress.set(0.1);
+      console.log(this.startDate, this.endDate);
       this.setToStrings();
       this.get_data_loaded();
       axios
@@ -474,9 +429,7 @@ components: { DateRangePicker },
             "&warehouse_id=" +
             this.Filter_warehouse +
             "&statut=" +
-            this.Filter_status +
-            "&payment_statut=" +
-            this.Filter_Payment +
+            this.Filter_status +           
             "&SortField=" +
             this.serverParams.sort.field +
             "&SortType=" +
