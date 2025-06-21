@@ -15,6 +15,10 @@ const mix = require('laravel-mix');
 const MomentLocalesPlugin = require('moment-locales-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
+// Configure Mix to use dart-sass
+mix.options({
+    processCssUrls: false
+});
 
 mix.js('resources/src/main.js', 'public').js('resources/src/login.js', 'public')
     .vue();
@@ -25,6 +29,11 @@ mix.js('resources/src/main.js', 'public').js('resources/src/login.js', 'public')
             filename:'js/[name].min.js',
             chunkFilename: 'js/bundle/[name].[hash].js',
           },
+        resolve: {
+            alias: {
+                'node-sass': 'sass'
+            }
+        },
         plugins: [
             new MomentLocalesPlugin(),
             new CleanWebpackPlugin({
