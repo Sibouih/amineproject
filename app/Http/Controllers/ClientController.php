@@ -82,15 +82,14 @@ class ClientController extends BaseController
 
             $item['total_amount'] = DB::table('sales')
                 ->where('deleted_at', '=', null)
-                ->where('statut', 'completed')
                 ->where('client_id', $client->id)
                 ->sum('GrandTotal');
 
-            $item['total_paid'] = DB::table('sales')
-                ->where('deleted_at', '=', null)
-                ->where('statut', 'completed')
-                ->where('client_id', $client->id)
-                ->sum('paid_amount');
+            $item['paid_sales'] = DB::table('payment_sales')
+                ->join('sales', 'payment_sales.sale_id', '=', 'sales.id')
+                ->where('payment_sales.deleted_at', '=', null)
+                ->where('sales.client_id', $client->id)
+                ->sum('payment_sales.montant');
 
             $item['paid_sales'] = DB::table('payment_sales')
                 ->join('sales', 'payment_sales.sale_id', '=', 'sales.id')
@@ -103,7 +102,7 @@ class ClientController extends BaseController
                 ->where('client_id', $client->id)
                 ->sum('montant');
 
-            $item['due'] = $item['total_amount'];
+            $item['due'] = $item['total_amount'] - ($item['paid_sales'] + $global_payments);
 
             $item['total_amount_return'] = DB::table('sale_returns')
                 ->where('deleted_at', '=', null)
@@ -127,7 +126,7 @@ class ClientController extends BaseController
             $item['city'] = $client->city;
             $item['remise'] = $client->remise;
             $item['credit_initial'] = $client->credit_initial ?? 0;
-            $item['total_credit'] = $client->credit_initial + $item['due'] - ($item['total_paid_return'] + $item['paid_sales'] + $global_payments);
+            $item['total_credit'] = $client->credit_initial + $item['due'] - $item['total_paid_return'];
             $item['adresse'] = $client->adresse;
             $data[] = $item;
         }
@@ -551,14 +550,20 @@ class ClientController extends BaseController
                 ->sum('GrandTotal');
 
             // Calculate total paid amount from sales
-            $total_paid = DB::table('sales')
-                ->where('deleted_at', '=', null)
-                ->where('statut', 'completed')
-                ->where('client_id', $client->id)
-                ->sum('paid_amount');
+            $total_paid = DB::table('payment_sales')
+                ->join('sales', 'payment_sales.sale_id', '=', 'sales.id')
+                ->where('payment_sales.deleted_at', '=', null)
+                ->where('sales.client_id', $client->id)
+                ->sum('payment_sales.montant');
 
-            // Calculate due amount
-            $due = $total_amount - $total_paid;
+            // Get global payments for this client
+            $global_payments = DB::table('client_payments')
+                ->where('deleted_at', '=', null)
+                ->where('client_id', $client->id)
+                ->sum('montant');
+            
+            // Calculate due amount (including both direct and global payments)
+            $due = $total_amount - ($total_paid + $global_payments);
 
             // Calculate total amount from returns
             $total_amount_return = DB::table('sale_returns')
@@ -576,7 +581,7 @@ class ClientController extends BaseController
             $return_due = $total_amount_return - $total_paid_return;
 
             // Calculate total credit (matches the formula in index method)
-            $total_credit = ($client->credit_initial ?? 0) + $due - $total_paid_return;
+            $total_credit = ($client->credit_initial ?? 0) + $due - $return_due;
 
             $item = [
                 'id' => $client->id,

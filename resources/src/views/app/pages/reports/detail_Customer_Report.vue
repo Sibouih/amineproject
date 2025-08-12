@@ -87,19 +87,6 @@
                   </b-button>
                 </div>
                 
-                <!-- Sales Total Footer -->
-                <template slot="table-footer">
-                  <div class="vgt-footer-total bg-light p-3 border-top">
-                    <div class="row">
-                      <div class="col-md-8">
-                        <strong>{{ $t('Total') }}</strong>
-                      </div>
-                      <div class="col-md-4 text-right">
-                        <strong>{{ currentUser.currency }} {{ formatNumber(salesTotal, 2) }}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </template>
                 <template slot="table-row" slot-scope="props">
                   <div v-if="props.column.field == 'statut'">
                     <span
@@ -154,6 +141,18 @@
                   </div>
                 </template>
               </vue-good-table>
+              
+              <!-- Sales Total Footer -->
+              <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                <div class="row">
+                  <div class="col-md-8">
+                    <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                  </div>
+                  <div class="col-md-4 text-right">
+                    <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(salesTotal, 2) }}</strong>
+                  </div>
+                </div>
+              </div>
             </b-tab>
 
             <!-- Quotations Table -->
@@ -189,19 +188,7 @@
                   </b-button>
                 </div>
                 
-                <!-- Quotations Total Footer -->
-                <template slot="table-footer">
-                  <div class="vgt-footer-total bg-light p-3 border-top">
-                    <div class="row">
-                      <div class="col-md-8">
-                        <strong>{{ $t('Total') }}</strong>
-                      </div>
-                      <div class="col-md-4 text-right">
-                        <strong>{{ currentUser.currency }} {{ formatNumber(quotationsTotal, 2) }}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </template>
+
                 
                 <template slot="table-row" slot-scope="props">
                   <div v-if="props.column.field == 'statut'">
@@ -221,6 +208,18 @@
                   </div>
                 </template>
               </vue-good-table>
+              
+              <!-- Quotations Total Footer -->
+              <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                <div class="row">
+                  <div class="col-md-8">
+                    <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                  </div>
+                  <div class="col-md-4 text-right">
+                    <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(quotationsTotal, 2) }}</strong>
+                  </div>
+                </div>
+              </div>
             </b-tab>
 
             <!-- Returns Table -->
@@ -256,19 +255,7 @@
                   </b-button>
                 </div>
                 
-                <!-- Returns Total Footer -->
-                <template slot="table-footer">
-                  <div class="vgt-footer-total bg-light p-3 border-top">
-                    <div class="row">
-                      <div class="col-md-8">
-                        <strong>{{ $t('Total') }}</strong>
-                      </div>
-                      <div class="col-md-4 text-right">
-                        <strong>{{ currentUser.currency }} {{ formatNumber(returnsTotal, 2) }}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </template>
+
                 
                 <template slot="table-row" slot-scope="props">
                   <div v-if="props.column.field == 'statut'">
@@ -301,6 +288,18 @@
                   </div>
                 </template>
               </vue-good-table>
+              
+              <!-- Returns Total Footer -->
+              <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                <div class="row">
+                  <div class="col-md-8">
+                    <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                  </div>
+                  <div class="col-md-4 text-right">
+                    <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(returnsTotal, 2) }}</strong>
+                  </div>
+                </div>
+              </div>
             </b-tab>
 
             <!-- Payments Table -->
@@ -348,20 +347,6 @@
                   </div>
                 </template>
                 
-                <!-- Direct Payments Total Footer -->
-                <template slot="table-footer">
-                  <div class="vgt-footer-total bg-light p-3 border-top">
-                    <div class="row">
-                      <div class="col-md-8">
-                        <strong>{{ $t('Total') }}</strong>
-                      </div>
-                      <div class="col-md-4 text-right">
-                        <strong>{{ currentUser.currency }} {{ formatNumber(directPaymentsTotal, 2) }}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-
                 <div slot="table-actions" class="mt-2 mb-3">
                   <b-button
                     @click="DirectPayments_PDF()"
@@ -371,8 +356,22 @@
                     <i class="i-File-Copy"></i> PDF
                   </b-button>
                 </div>
-              </vue-good-table>
-            </b-tab>
+                
+
+                              </vue-good-table>
+                
+                <!-- Direct Payments Total Footer -->
+                <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                  <div class="row">
+                    <div class="col-md-8">
+                      <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                    </div>
+                    <div class="col-md-4 text-right">
+                      <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(directPaymentsTotal, 2) }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </b-tab>
 
             <!-- Global Payments Table -->
             <b-tab :title="$t('GlobalPayments')">
@@ -397,20 +396,6 @@
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
-                <!-- Global Payments Total Footer -->
-                <template slot="table-footer">
-                  <div class="vgt-footer-total bg-light p-3 border-top">
-                    <div class="row">
-                      <div class="col-md-8">
-                        <strong>{{ $t('Total') }}</strong>
-                      </div>
-                      <div class="col-md-4 text-right">
-                        <strong>{{ currentUser.currency }} {{ formatNumber(globalPaymentsTotal, 2) }}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-                
                 <div slot="table-actions" class="mt-2 mb-3">
                   <b-button
                     @click="GlobalPayments_PDF()"
@@ -420,8 +405,22 @@
                     <i class="i-File-Copy"></i> PDF
                   </b-button>
                 </div>
-              </vue-good-table>
-            </b-tab>
+                
+
+                              </vue-good-table>
+                
+                <!-- Global Payments Total Footer -->
+                <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                  <div class="row">
+                    <div class="col-md-8">
+                      <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                    </div>
+                    <div class="col-md-4 text-right">
+                      <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(globalPaymentsTotal, 2) }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </b-tab>
           </b-tabs>
         </b-card>
       </b-col>
@@ -1395,7 +1394,7 @@ export default {
     Get_DirectPayments(page) {
       axios
         .get(
-          "report/direct_payments?page=" +
+          "report/payments?page=" +
             page +
             "&limit=" +
             this.limit_payments +
@@ -1405,8 +1404,8 @@ export default {
             this.$route.params.id
         )
         .then((response) => {
-          this.direct_payments = response.data.payments;
-          this.totalRows_direct_payments = response.data.totalRows;
+          this.direct_payments = response.data.payments.direct_payments;
+          this.totalRows_direct_payments = response.data.directPaymentsTotalRows;
         })
         .catch((response) => {});
     },
@@ -1432,7 +1431,7 @@ export default {
     Get_GlobalPayments(page) {
       axios
         .get(
-          "report/global_payments?page=" +
+          "report/payments?page=" +
             page +
             "&limit=" +
             this.limit_payments +
@@ -1442,8 +1441,8 @@ export default {
             this.$route.params.id
         )
         .then((response) => {
-          this.global_payments = response.data.payments;
-          this.totalRows_global_payments = response.data.totalRows;
+          this.global_payments = response.data.payments.global_payments;
+          this.totalRows_global_payments = response.data.globalPaymentsTotalRows;
         })
         .catch((response) => {});
     },

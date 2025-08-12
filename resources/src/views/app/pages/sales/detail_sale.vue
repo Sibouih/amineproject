@@ -63,7 +63,7 @@
             <table class="table table-bordered">
               <thead>
                 <tr>
-                  <th width="5%" class="text-center">N°</th>
+                  <th width="5%" class="text-center">#</th>
                   <th width="45%">{{$t('ProductName')}}</th>
                   <th width="15%" class="text-center">{{$t('Qty')}}</th>
                   <th width="15%" class="text-center">{{$t('Price')}}</th>

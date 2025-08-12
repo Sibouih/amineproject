@@ -76,6 +76,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get("report/purchase_products_details", "ReportController@purchase_products_details");
     Route::get("report/sale_returns_products_details", "ReportController@sale_returns_products_details");
     Route::get("report/purchase_returns_products_details", "ReportController@purchase_returns_products_details");
+    Route::get("report/adjustment_products_details", "ReportController@adjustment_products_details");
     Route::get("report/product_sales_report", "ReportController@product_sales_report");
     Route::get("report/product_purchases_report", "ReportController@product_purchases_report");
 
@@ -108,13 +109,12 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
 
     Route::get("report/client_payments", "ReportController@Payments_Client");
     Route::get("report/client_payments/{id}", "ReportController@Payment_Detail");
-    Route::get("report/client_payments/{id}/sale_payments", "ReportController@Sale_Payments_By_Client_Payment");
+    Route::get("report/client_payments/{id}/sale_payments", "ReportController@Payment_Detail");
     Route::get("report/client_quotations", "ReportController@Quotations_Client");
-    Route::get("report/direct_payments", "ReportController@Direct_Payments_Client");
-    Route::get("report/global_payments", "ReportController@Global_Payments_Client");
-    Route::get("report/global_client_payments", "ReportController@Global_Client_Payments");
+    Route::get("report/payments", "ReportController@Payments_Client");
+    Route::get("report/global_client_payments", "ReportController@Payments_Client");
     Route::get("report/old_payment_detail/{id}", "ReportController@Old_Payment_Detail");
-    Route::get("report/client_payments_report", "ReportController@Client_Payments_Report");
+    Route::get("report/client_payments_report", "ReportController@Payments_Client");
 
     //------------------------------Employee------------------------------------\\
 
@@ -543,5 +543,3 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get('clients_export_all', 'ClientController@exportAllClients');
 
     Route::get("report/old_payment_detail/{id}", "ReportController@Old_Payment_Detail");
-    Route::get("report/direct_payments", "ReportController@Direct_Payments_Client");
-    Route::get("report/global_payments", "ReportController@Global_Payments_Client");

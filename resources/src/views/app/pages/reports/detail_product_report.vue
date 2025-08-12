@@ -89,6 +89,18 @@
               </div>
             </b-card>
           </b-col>
+
+          <!-- Adjustments Card -->
+          <b-col lg="3" md="6" sm="12">
+            <b-card class="card-icon-bg card-icon-bg-info o-hidden mb-30 text-center">
+              <i class="i-Gear"></i>
+              <div class="content">
+                <p class="text-muted mt-2 mb-0">{{$t('Adjustments')}}</p>
+                <p class="text-info text-24 line-height-1 mb-2">{{totalAdjustmentsCount}}</p>
+                <p class="text-muted mb-0">{{currentUser.currency}} {{formatNumber(totalAdjustmentsAmount, 2)}}</p>
+              </div>
+            </b-card>
+          </b-col>
         </b-row>
       </b-col>
 
@@ -332,6 +344,69 @@
               </b-col>
             </b-row>
 
+            <!-- Adjustments Table -->
+            <b-row v-if="!isLoading">
+              <b-col md="12">                
+                <b-tab :title="$t('Adjustments')">
+                  <vue-good-table
+                    mode="remote"
+                    :columns="columns_adjustments"
+                    :totalRows="totalRows_adjustments"
+                    :rows="rows_adjustments"
+                    :group-options="{
+                      enabled: true,
+                      headerPosition: 'bottom',
+                    }"
+                    @on-page-change="PageChangeAdjustments"
+                    @on-per-page-change="onPerPageChangeAdjustments"
+                    @on-search="onSearch_adjustments"
+                    :search-options="{
+                      placeholder: $t('Search_this_table'),
+                      enabled: true,
+                    }"
+                    :pagination-options="{
+                      enabled: true,
+                      mode: 'records',
+                      nextLabel: 'next',
+                      prevLabel: 'prev',
+                      perPageDropdown: [10, 25, 50, 100, 250, 500],
+                    }"
+                    styleClass="tableOne table-hover vgt-table"
+                  >
+                  <div slot="table-actions" class="mt-2 mb-3">
+                    <b-button variant="outline-info ripple m-1" size="sm" v-b-toggle.sidebar-right>
+                      <i class="i-Filter-2"></i>
+                      {{ $t("Filter") }}
+                    </b-button>
+
+                  </div>
+                    <template slot="table-row" slot-scope="props">
+                      <div v-if="props.column.field == 'Ref'">
+                        <router-link
+                          :to="'/app/adjustments/detail/'+props.row.adjustment_id"
+                        >
+                          <span class="ul-btn__text ml-1">{{props.row.Ref}}</span>
+                        </router-link>
+                      </div>
+
+                      <div v-else-if="props.column.field == 'quantity'">
+                        <span :class="props.row.type === 'add' ? 'text-success' : 'text-danger'">
+                          {{props.row.type === 'add' ? '+' : '-'}}{{props.row.quantity}}
+                        </span>
+                      </div>
+
+                      <div v-else-if="props.column.field == 'type'">
+                        <span :class="props.row.type === 'add' ? 'text-success' : 'text-danger'">
+                          {{props.row.type === 'add' ? $t('Addition') : $t('Subtraction')}}
+                        </span>
+                      </div>
+
+                    </template>
+                  </vue-good-table>
+                </b-tab>                
+              </b-col>
+            </b-row>
+
           </b-tabs>
         </b-card>
       </b-col>
@@ -357,7 +432,7 @@
                 :reduce="label => label.value"
                 :placeholder="$t('Choose_Customer')"
                 v-model="Filter_Client"
-                :options="customers.map(customers => ({label: customers.name, value: customers.id}))"
+                :options="(customers || []).map(customers => ({label: customers.name, value: customers.id}))"
               />
             </b-form-group>
           </b-col>
@@ -369,7 +444,7 @@
                 v-model="Filter_warehouse"
                 :reduce="label => label.value"
                 :placeholder="$t('Choose_Warehouse')"
-                :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
+                :options="(warehouses || []).map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
               />
             </b-form-group>
           </b-col>
@@ -381,7 +456,7 @@
                 :reduce="label => label.value"
                 placeholder="Choose Vendeur"
                 v-model="Filter_user"
-                :options="users.map(users => ({label: users.username, value: users.id}))"
+                :options="(users || []).map(users => ({label: users.username, value: users.id}))"
               />
             </b-form-group>
           </b-col>
@@ -432,18 +507,22 @@ export default {
       totalRows_purchases: "",
       totalRows_sales_returns: "",
       totalRows_purchase_returns: "",
+      totalRows_adjustments: "",
       limit_sales: "10",
       limit_purchases: "10",
       limit_sales_returns: "10",
       limit_purchase_returns: "10",
+      limit_adjustments: "10",
       sales_page: 1,
       purchases_page: 1,
       sales_returns_page: 1,
       purchase_returns_page: 1,
+      adjustments_page: 1,
       search_sales:"",
       search_purchases:"",
       search_sales_returns:"",
       search_purchase_returns:"",
+      search_adjustments:"",
 
       Filter_Client: "",
       Filter_Provider: "",
@@ -457,6 +536,7 @@ export default {
       purchases: [],
       sales_returns: [],
       purchase_returns: [],
+      adjustments: [],
       rows_sales: [{
         children: [],
       }],
@@ -469,11 +549,15 @@ export default {
       rows_purchase_returns: [{
         children: [],
       }],
+      rows_adjustments: [{
+        children: [],
+      }],
       summaries: {
         sales: { total_count: 0, total_amount: 0, total_quantity: 0 },
         purchases: { total_count: 0, total_amount: 0, total_quantity: 0 },
         sales_returns: { total_count: 0, total_amount: 0, total_quantity: 0 },
         purchase_returns: { total_count: 0, total_amount: 0, total_quantity: 0 },
+        adjustments: { total_count: 0, total_amount: 0, total_quantity: 0 },
       },
       warehouses: [],
       customers: [],
@@ -536,6 +620,14 @@ export default {
 
     totalPurchaseReturnsAmount() {
       return this.summaries.purchase_returns.total_amount || 0;
+    },
+
+    totalAdjustmentsCount() {
+      return this.summaries.adjustments.total_count || 0;
+    },
+
+    totalAdjustmentsAmount() {
+      return this.summaries.adjustments.total_amount || 0;
     },
    
     columns_sales() {
@@ -813,6 +905,60 @@ export default {
         
       ];
     },
+
+    columns_adjustments() {
+      return [
+        {
+          label: this.$t("date"),
+          field: "date",
+          tdClass: "text-left",
+          thClass: "text-left"
+        },
+        {
+          label: this.$t("Reference"),
+          field: "Ref",
+          tdClass: "text-left",
+          thClass: "text-left"
+        },
+         {
+          label: this.$t("Created_by"),
+          field: "created_by",
+          tdClass: "text-left",
+          thClass: "text-left",
+           sortable: false
+        },
+        {
+          label: this.$t("product_name"),
+          field: "product_name",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("warehouse"),
+          field: "warehouse_name",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Quantity"),
+          field: "quantity",
+          headerField: this.sumTotalQte,
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Type"),
+          field: "type",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        
+      ];
+    },
   },
 
   methods: {
@@ -823,6 +969,7 @@ export default {
       this.Get_Purchases(1);
       this.Get_Sales_Returns(1);
       this.Get_Purchase_Returns(1);
+      this.Get_Adjustments(1);
     },
 
       //------ Reset Filter
@@ -832,6 +979,7 @@ export default {
       this.search_purchases = "";
       this.search_sales_returns = "";
       this.search_purchase_returns = "";
+      this.search_adjustments = "";
       this.Filter_Client = "";
       this.Filter_Provider = "";
       this.Filter_Ref = "";
@@ -841,6 +989,7 @@ export default {
       this.Get_Purchases(1);
       this.Get_Sales_Returns(1);
       this.Get_Purchase_Returns(1);
+      this.Get_Adjustments(1);
     },
 
      //----------------------------------- Sales PDF ------------------------------\\
@@ -908,6 +1057,13 @@ export default {
       }
     },
 
+    //--------------------------- Event Page Change Adjustments -------------\\
+    PageChangeAdjustments({ currentPage }) {
+      if (this.adjustments_page !== currentPage) {
+        this.Get_Adjustments(currentPage);
+      }
+    },
+
     //--------------------------- Limit Page Sales -------------\\
     onPerPageChangeSales({ currentPerPage }) {
       if (this.limit_sales !== currentPerPage) {
@@ -938,6 +1094,13 @@ export default {
       }
     },
 
+    onPerPageChangeAdjustments({ currentPerPage }) {
+      if (this.limit_adjustments !== currentPerPage) {
+        this.limit_adjustments = currentPerPage;
+        this.Get_Adjustments(1);
+      }
+    },
+
     onSearch_sales(value) {
       this.search_sales = value.searchTerm;
       this.Get_Sales(1);
@@ -958,6 +1121,11 @@ export default {
       this.Get_Purchase_Returns(1);
     },
 
+    onSearch_adjustments(value) {
+      this.search_adjustments = value.searchTerm;
+      this.Get_Adjustments(1);
+    },
+
     sumTotalQte(rowObj) {
       if (!rowObj || !rowObj.children || !Array.isArray(rowObj.children)) {
         console.error('Invalid input for Total Amount');
@@ -965,8 +1133,21 @@ export default {
       }
       let sum = 0;
       for (let i = 0; i < rowObj.children.length; i++) {
-        let qty = parseFloat(rowObj.children[i].quantity.split(" ")[0]);
-        sum += qty;
+        try {
+          let quantity = rowObj.children[i].quantity;
+          if (typeof quantity === 'string') {
+            // Handle string quantities like "10 pc"
+            let qty = parseFloat(quantity.split(" ")[0]);
+            if (!isNaN(qty)) {
+              sum += qty;
+            }
+          } else if (typeof quantity === 'number') {
+            // Handle numeric quantities
+            sum += quantity;
+          }
+        } catch (error) {
+          console.warn('Error parsing quantity:', rowObj.children[i].quantity, error);
+        }
       }
       return sum.toString() + " pc";
     },
@@ -978,9 +1159,20 @@ export default {
       }
       let sum = 0;
       for (let i = 0; i < rowObj.children.length; i++) {
-        console.log('rowObj.children[i].cost', rowObj.children[i])
-        let cost = parseFloat(rowObj.children[i].cost);
-        sum += cost;
+        try {
+          console.log('rowObj.children[i].cost', rowObj.children[i])
+          let cost = rowObj.children[i].cost;
+          if (typeof cost === 'number' && !isNaN(cost)) {
+            sum += cost;
+          } else if (typeof cost === 'string') {
+            let parsedCost = parseFloat(cost);
+            if (!isNaN(parsedCost)) {
+              sum += parsedCost;
+            }
+          }
+        } catch (error) {
+          console.warn('Error parsing cost:', rowObj.children[i].cost, error);
+        }
       }
       return sum.toString() + " pc";
     },
@@ -993,7 +1185,19 @@ export default {
       let sum_amount = 0;
 
       for (let i = 0; i < rowObj.children.length; i++) {
-        sum_amount += rowObj.children[i].total;
+        try {
+          let total = rowObj.children[i].total;
+          if (typeof total === 'number' && !isNaN(total)) {
+            sum_amount += total;
+          } else if (typeof total === 'string') {
+            let parsedTotal = parseFloat(total);
+            if (!isNaN(parsedTotal)) {
+              sum_amount += parsedTotal;
+            }
+          }
+        } catch (error) {
+          console.warn('Error parsing total:', rowObj.children[i].total, error);
+        }
       }
       return sum_amount + ' dh';
     },
@@ -1003,7 +1207,11 @@ export default {
       var self = this;
       self.startDate =  self.dateRange.startDate.toJSON().slice(0, 10);
       self.endDate = self.dateRange.endDate.toJSON().slice(0, 10);
-      self.Get_Sales(1);
+      this.Get_Sales(1);
+      this.Get_Purchases(1);
+      this.Get_Sales_Returns(1);
+      this.Get_Purchase_Returns(1);
+      this.Get_Adjustments(1);
     },
 
 
@@ -1066,24 +1274,31 @@ export default {
             this.$route.params.id
         )
         .then(response => {
-          this.sales = response.data.sales;
+          this.sales = response.data.sales || [];
           this.rows_sales = [{
-            children: response.data.sales,
+            children: response.data.sales || [],
           }];
           if (response.data.summary) {
             this.summaries.sales = response.data.summary;
           }
-          this.totalRows_sales = response.data.totalRows;
-          this.customers = response.data.customers;
-          this.warehouses = response.data.warehouses;
-          this.users = response.data.users;
+          this.totalRows_sales = response.data.totalRows || 0;
+          this.customers = response.data.customers || [];
+          this.warehouses = response.data.warehouses || [];
+          this.users = response.data.users || [];
 
           NProgress.done();
           this.isLoading = false;
           this.today_mode = false;
         })
         .catch(response => {
-           NProgress.done();
+          // Reset to safe state on error
+          this.sales = [];
+          this.rows_sales = [{
+            children: [],
+          }];
+          this.totalRows_sales = 0;
+          
+          NProgress.done();
           setTimeout(() => {
             this.isLoading = false;
             this.today_mode = false;
@@ -1122,25 +1337,32 @@ export default {
             this.$route.params.id
         )
         .then(response => {
-          this.purchases = response.data.purchases;
+          this.purchases = response.data.purchases || [];
           this.rows_purchases = [{
-            children: response.data.purchases,
+            children: response.data.purchases || [],
           }];
           if (response.data.summary) {
             this.summaries.purchases = response.data.summary;
           }
-          this.totalRows_purchases = response.data.totalRows;
-          this.providers = response.data.providers;
+          this.totalRows_purchases = response.data.totalRows || 0;
+          this.providers = response.data.providers || [];
           console.log('this.providers', this.providers)
-          this.warehouses = response.data.warehouses;
-          this.users = response.data.users;
+          this.warehouses = response.data.warehouses || [];
+          this.users = response.data.users || [];
 
           NProgress.done();
           this.isLoading = false;
           this.today_mode = false;
         })
         .catch(response => {
-           NProgress.done();
+          // Reset to safe state on error
+          this.purchases = [];
+          this.rows_purchases = [{
+            children: [],
+          }];
+          this.totalRows_purchases = 0;
+          
+          NProgress.done();
           setTimeout(() => {
             this.isLoading = false;
             this.today_mode = false;
@@ -1179,24 +1401,31 @@ export default {
             this.$route.params.id
         )
         .then(response => {
-          this.sales_returns = response.data.sales_returns;
+          this.sales_returns = response.data.sales_returns || [];
           this.rows_sales_returns = [{
-            children: response.data.sales_returns,
+            children: response.data.sales_returns || [],
           }];
           if (response.data.summary) {
             this.summaries.sales_returns = response.data.summary;
           }
-          this.totalRows_sales_returns = response.data.totalRows;
-          this.customers = response.data.customers;
-          this.warehouses = response.data.warehouses;
-          this.users = response.data.users;
+          this.totalRows_sales_returns = response.data.totalRows || 0;
+          this.customers = response.data.customers || [];
+          this.warehouses = response.data.warehouses || [];
+          this.users = response.data.users || [];
 
           NProgress.done();
           this.isLoading = false;
           this.today_mode = false;
         })
         .catch(response => {
-           NProgress.done();
+          // Reset to safe state on error
+          this.sales_returns = [];
+          this.rows_sales_returns = [{
+            children: [],
+          }];
+          this.totalRows_sales_returns = 0;
+          
+          NProgress.done();
           setTimeout(() => {
             this.isLoading = false;
             this.today_mode = false;
@@ -1235,24 +1464,91 @@ export default {
             this.$route.params.id
         )
         .then(response => {
-          this.purchase_returns = response.data.purchase_returns;
+          this.purchase_returns = response.data.purchase_returns || [];
           this.rows_purchase_returns = [{
-            children: response.data.purchase_returns,
+            children: response.data.purchase_returns || [],
           }];
           if (response.data.summary) {
             this.summaries.purchase_returns = response.data.summary;
           }
-          this.totalRows_purchase_returns = response.data.totalRows;
-          this.providers = response.data.providers;
-          this.warehouses = response.data.warehouses;
-          this.users = response.data.users;
+          this.totalRows_purchase_returns = response.data.totalRows || 0;
+          this.providers = response.data.providers || [];
+          this.warehouses = response.data.warehouses || [];
+          this.users = response.data.users || [];
 
           NProgress.done();
           this.isLoading = false;
           this.today_mode = false;
         })
         .catch(response => {
-           NProgress.done();
+          // Reset to safe state on error
+          this.purchase_returns = [];
+          this.rows_purchase_returns = [{
+            children: [],
+          }];
+          this.totalRows_purchase_returns = 0;
+          
+          NProgress.done();
+          setTimeout(() => {
+            this.isLoading = false;
+            this.today_mode = false;
+          }, 500);
+        });
+    },
+    
+    //--------------------------- Get Adjustments -------------\\
+    Get_Adjustments(page) {
+      // Start the progress bar.
+      NProgress.start();
+      NProgress.set(0.1);
+      this.get_data_loaded();
+
+      axios
+        .get(
+          "/report/adjustment_products_details?page=" +
+            page +
+            "&Ref=" +
+            this.Filter_Ref +
+            "&warehouse_id=" +
+            this.Filter_warehouse +
+            "&user_id=" +
+            this.Filter_user +
+            "&limit=" +
+            this.limit_adjustments +
+            "&to=" +
+            this.endDate +
+            "&from=" +
+            this.startDate +
+            "&search=" +
+            this.search_adjustments +
+            "&id=" +
+            this.$route.params.id
+        )
+        .then(response => {
+          this.adjustments = response.data.adjustments || [];
+          this.rows_adjustments = [{
+            children: response.data.adjustments || [],
+          }];
+          if (response.data.summary) {
+            this.summaries.adjustments = response.data.summary;
+          }
+          this.totalRows_adjustments = response.data.totalRows || 0;
+          this.warehouses = response.data.warehouses || [];
+          this.users = response.data.users || [];
+
+          NProgress.done();
+          this.isLoading = false;
+          this.today_mode = false;
+        })
+        .catch(response => {
+          // Reset to safe state on error
+          this.adjustments = [];
+          this.rows_adjustments = [{
+            children: [],
+          }];
+          this.totalRows_adjustments = 0;
+          
+          NProgress.done();
           setTimeout(() => {
             this.isLoading = false;
             this.today_mode = false;
@@ -1272,6 +1568,7 @@ export default {
     this.Get_Purchases(1);
     this.Get_Sales_Returns(1);
     this.Get_Purchase_Returns(1);
+    this.Get_Adjustments(1);
   }
 };
 </script>

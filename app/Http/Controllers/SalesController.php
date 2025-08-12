@@ -885,15 +885,20 @@ class SalesController extends BaseController
             ->where('client_id', $sale_data['client']->id)
             ->where('date', '<=', $sale_data->date)
             ->where('id', '<=', $id)  // Include current and previous sales only
-            ->sum('GrandTotal');
+            ->sum('GrandTotal');  
 
-        $sales_paid = DB::table('sales')
+        $sales_paid = DB::table('payment_sales')
+            ->join('sales', 'payment_sales.sale_id', '=', 'sales.id')
+            ->where('payment_sales.deleted_at', '=', null)
+            ->where('sales.date', '<=', $sale_data->date)
+            ->where('sales.id', '<=', $id)  // Include current and previous sales only
+            ->where('sales.client_id', $sale_data['client']->id)
+            ->sum('payment_sales.montant');
+
+        $global_payments = DB::table('client_payments')
             ->where('deleted_at', '=', null)
-            ->where('statut', 'completed')
             ->where('client_id', $sale_data['client']->id)
-            ->where('date', '<=', $sale_data->date)
-            ->where('id', '<=', $id)  // Include current and previous sales only
-            ->sum('paid_amount');
+            ->sum('montant');
 
         $returns_paid = DB::table('sale_returns')
             ->where('deleted_at', '=', null)
@@ -901,14 +906,8 @@ class SalesController extends BaseController
             ->sum('paid_amount');
 
         $client_credit_initial = $sale_data['client']->credit_initial;   
-        // dump('$sales_total', $sales_total);
-        // dump('$sales_paid', $sales_paid);
-        // dump('$returns_paid', $returns_paid);
-        // dump('$sale_data->GrandTotal', $sale_data->GrandTotal);
-        // dump('$client_credit_initial', $client_credit_initial);
-
-        // Calculate due amount for all sales up to and including the current one
-        $sale_due = $sales_total - $sales_paid - $returns_paid - $sale_data->GrandTotal + $client_credit_initial;
+        
+        $sale_due = $sales_total - ($sales_paid + $global_payments) - $returns_paid - $sale_data->GrandTotal + $client_credit_initial;        
         
         // Get client's credit initial value
         $total_credit = $sale_due + $sale_data->GrandTotal;
