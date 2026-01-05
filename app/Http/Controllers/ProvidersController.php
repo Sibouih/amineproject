@@ -311,7 +311,7 @@ class ProvidersController extends BaseController
                     $provider->credit_initial = $provider->credit_initial - $paid_amount_total;
                 }
                 $provider->save();
-                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
+                $this->createPayment($request, $paid_aux, null, null, 'credit_initial');
             }
 
             if ($request->type == 'credit_achats_only' || $request->type == 'credit_initial_first' || $request->type == 'credit_achats_first') {
@@ -327,7 +327,7 @@ class ProvidersController extends BaseController
                         $amount = $paid_amount_total;
                         $payment_status = 'partial';
                     }
-                    $this->createPayment($request, $provider_purchase, $amount, $payment_status);
+                    $this->createPayment($request, $amount, $payment_status, $provider_purchase);
                     $paid_amount_total -= $amount;
                 }
             }
@@ -343,7 +343,7 @@ class ProvidersController extends BaseController
                     $provider->credit_initial = $provider->credit_initial - $paid_amount_total;
                 }
                 $provider->save();
-                $this->createPayment($request, null, $paid_aux, null,'credit_initial');
+                $this->createPayment($request, $paid_aux, null, null, 'credit_initial');
             }
             
         }
@@ -351,7 +351,7 @@ class ProvidersController extends BaseController
  
      }
 
-     protected function createPayment($request, $provider_purchase = null, $amount, $payment_status, $type = 'purchase') {
+     protected function createPayment($request, $amount, $payment_status, $provider_purchase = null, $type = 'purchase') {
         $payment_purchase = new PaymentPurchase();
         if ($provider_purchase !== null) {
             $payment_purchase->purchase_id = $provider_purchase->id;

@@ -31,7 +31,10 @@ class ClientPaymentPolicy
      */
     public function view(User $user)
     {
-        $permission = Permission::where('name', 'payments_view')->first();
+        $permission = Permission::where('name', 'payment_sales_view')->first();
+        if (!$permission) {
+            return true; // Allow if permission doesn't exist
+        }
         return $user->hasRole($permission->roles);
     }
 
@@ -43,7 +46,10 @@ class ClientPaymentPolicy
      */
     public function create(User $user)
     {
-        $permission = Permission::where('name', 'payments_add')->first();
+        $permission = Permission::where('name', 'payment_sales_add')->first();
+        if (!$permission) {
+            return true; // Allow if permission doesn't exist
+        }
         return $user->hasRole($permission->roles);
     }
 
@@ -56,7 +62,10 @@ class ClientPaymentPolicy
      */
     public function update(User $user)
     {
-        $permission = Permission::where('name', 'payments_edit')->first();
+        $permission = Permission::where('name', 'payment_sales_edit')->first();
+        if (!$permission) {
+            return true; // Allow if permission doesn't exist
+        }
         return $user->hasRole($permission->roles);
     }
 
@@ -69,7 +78,10 @@ class ClientPaymentPolicy
      */
     public function delete(User $user)
     {
-        $permission = Permission::where('name', 'payments_delete')->first();
+        $permission = Permission::where('name', 'payment_sales_delete')->first();
+        if (!$permission) {
+            return true; // Allow if permission doesn't exist
+        }
         return $user->hasRole($permission->roles);
     }
 

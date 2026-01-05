@@ -114,7 +114,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get("report/payments", "ReportController@Payments_Client");
     Route::get("report/global_client_payments", "ReportController@Payments_Client");
     Route::get("report/old_payment_detail/{id}", "ReportController@Old_Payment_Detail");
-    Route::get("report/client_payments_report", "ReportController@Payments_Client");
+    Route::get("report/client_payments_report", "ReportController@client_payments_report");
 
     //------------------------------Employee------------------------------------\\
 

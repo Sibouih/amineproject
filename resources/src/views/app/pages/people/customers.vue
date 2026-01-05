@@ -1001,7 +1001,7 @@ export default {
       email_exist : "",
       allClientsData: [],
       allClientsColumns: [
-        { label: 'no Client', field: 'id' },
+        { label: 'N°', field: 'id' },
         { label: 'Nom & prénom', field: 'name' },
         { label: 'Tél', field: 'phone' },
         { label: 'Ville', field: 'city' },
@@ -1276,26 +1276,70 @@ export default {
 
     prepareExportData(data) {
       // Filter clients with credit > 0
-      const filteredData = data.filter(client => parseFloat(client.total_credit) > 0);
+      const filteredData = data.filter(client => {
+        const creditValue = this.parseCredit(client.total_credit);
+        return creditValue > 0;
+      });
       
       if (filteredData.length === 0) {
         this.makeToast("warning", this.$t("No clients with credit found"), this.$t("Warning"));
         return null;
       }
 
-      // Calculate total credit
-      const totalCredit = filteredData.reduce((sum, client) => sum + (parseFloat(client.total_credit) || 0), 0);
+      // Add sequential numbering and prepare data
+      const numberedData = filteredData.map((client, index) => ({
+        ...client,
+        id: index + 1, // Sequential numbering starting from 1
+        total_credit: this.parseCredit(client.total_credit) // Ensure proper numeric value
+      }));
+
+      // Calculate total credit correctly
+      const totalCredit = numberedData.reduce((sum, client) => sum + client.total_credit, 0);
       
-      // Add total row
-      filteredData.push({
+      // Add total row with properly formatted total
+      numberedData.push({
         id: '',
         name: 'Total',
         phone: '',
         city: '',
-        total_credit: totalCredit
+        total_credit: Math.round(totalCredit * 100) / 100 // Round to 2 decimal places
       });
 
-      return filteredData;
+      return numberedData;
+    },
+
+    // Helper function to parse credit values properly
+    parseCredit(creditValue) {
+      if (typeof creditValue === 'number') {
+        return creditValue;
+      }
+      
+      if (typeof creditValue === 'string') {
+        // Remove any non-numeric characters except decimal point and minus
+        const cleanValue = creditValue.replace(/[^\d.-]/g, '');
+        const parsed = parseFloat(cleanValue);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      
+      return 0;
+    },
+
+    // Helper function to format currency properly
+    formatCurrency(amount) {
+      if (isNaN(amount)) return '0.00 DH';
+      
+      // Convert to fixed 2 decimals
+      const fixed = parseFloat(amount).toFixed(2);
+      
+      // Split into integer and decimal parts
+      const parts = fixed.split('.');
+      const integerPart = parts[0];
+      const decimalPart = parts[1];
+      
+      // Add space every 3 digits for thousands separator
+      const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      
+      return `${formattedInteger}.${decimalPart} DH`;
     },
 
     //--------------------------------- Customers PDF -------------------------------\\
@@ -1330,25 +1374,66 @@ export default {
 
       const pdf = new jsPDF('l', 'pt', 'a4');
 
-      // Add title
-      pdf.setFontSize(18);
-      const title = 'Liste des clients avec crédits';
+      // Enhanced header design
       const pageWidth = pdf.internal.pageSize.width;
+      const pageHeight = pdf.internal.pageSize.height;
+      
+      // Add header background
+      pdf.setFillColor(240, 248, 255); // Light blue background
+      pdf.rect(0, 0, pageWidth, 80, 'F');
+      
+      // Add header border
+      pdf.setDrawColor(70, 130, 180); // Steel blue border
+      pdf.setLineWidth(2);
+      pdf.line(0, 80, pageWidth, 80);
+
+      // Add title with enhanced styling
+      pdf.setFontSize(22);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(25, 25, 112); // Midnight blue
+      const title = 'LISTE DES CLIENTS AVEC CRÉDITS';
       const titleWidth = pdf.getStringUnitWidth(title) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
       const titleX = (pageWidth - titleWidth) / 2;
+      pdf.text(title, titleX, 45);
 
-      pdf.text(title, titleX, 40);
-      // Add underline
-      pdf.setLineWidth(0.5);
-      pdf.line(titleX, 45, titleX + titleWidth, 45);
+      // Add generation date and time
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      const now = new Date();
+      const dateStr = `Généré le: ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`;
+      const dateWidth = pdf.getStringUnitWidth(dateStr) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
+      const dateX = (pageWidth - dateWidth) / 2;
+      pdf.text(dateStr, dateX, 65);
 
-      pdf.setFontSize(12);
+      // Reset text color for table
+      pdf.setTextColor(0, 0, 0);
       
-      // Prepare the data
+      // Find the credit column index
+      const creditColumnIndex = columns.findIndex(col => col.field === 'total_credit');
+      
+      // Prepare the data with better formatting
       const rows = data.map(item => 
-        columns.map(col => {
+        columns.map((col, index) => {
           const value = item[col.field];
-          return value !== undefined && value !== null ? value.toString() : '';
+          if (value === undefined || value === null) return '';
+          
+          // Special formatting for credit column
+          if (col.field === 'total_credit') {
+            // Use the parseCredit helper to ensure proper numeric value
+            const numValue = typeof value === 'number' ? value : this.parseCredit(value);
+            if (isNaN(numValue)) return '0.00 DH';
+            
+            // Simple formatting with dot as decimal separator and space as thousands separator
+            return this.formatCurrency(numValue);
+          }
+          
+          // Special formatting for ID column (no Client)
+          if (col.field === 'id' && value === '') {
+            return ''; // Empty for total row
+          }
+          
+          return value.toString();
         })
       );
       
@@ -1356,20 +1441,87 @@ export default {
       const headers = columns.map(col => col.label);
 
       try {
-        // Add the table
+        // Add the table with enhanced styling
         pdf.autoTable({
           head: [headers],
           body: rows,
-          startY: 60,
-          margin: { top: 60, right: 40, bottom: 40, left: 40 },
-          styles: { font: 'helvetica', fontSize: 8, overflow: 'linebreak', cellWidth: 'wrap' },
-          columnStyles: { text: { cellWidth: 'auto' } },
-          didParseCell: function (data) {
-            if (data.row.index === rows.length - 1) {
-              data.cell.styles.fillColor = [255, 255, 0];
-              data.cell.styles.textColor = [0, 0, 0];
-              data.cell.styles.fontStyle = 'bold';
+          startY: 100,
+          margin: { top: 100, right: 30, bottom: 40, left: 30 },
+          
+          // Enhanced table styling
+          theme: 'striped',
+          styles: { 
+            font: 'helvetica', 
+            fontSize: 10, 
+            overflow: 'linebreak', 
+            cellWidth: 'wrap',
+            valign: 'middle',
+            halign: 'center',
+            lineColor: [200, 200, 200],
+            lineWidth: 0.5
+          },
+          
+          // Header styling
+          headStyles: {
+            fillColor: [70, 130, 180], // Steel blue
+            textColor: [255, 255, 255], // White text
+            fontSize: 11,
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'middle'
+          },
+          
+          // Column-specific styling
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 'auto' }, // ID column
+            1: { halign: 'left', cellWidth: 'auto' },   // Name column
+            2: { halign: 'center', cellWidth: 'auto' }, // Phone column
+            3: { halign: 'left', cellWidth: 'auto' },   // City column
+            4: { 
+              halign: 'right', 
+              cellWidth: 'auto',
+              fontStyle: 'bold',
+              fillColor: [255, 255, 240], // Light yellow background for credit
+              textColor: [139, 0, 0] // Dark red text for credit
             }
+          },
+          
+          // Row styling with special handling
+          didParseCell: function (data) {
+            // Total row styling (last row)
+            if (data.row.index === rows.length - 1) {
+              data.cell.styles.fillColor = [255, 215, 0]; // Gold background
+              data.cell.styles.textColor = [0, 0, 0]; // Black text
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fontSize = 11;
+              
+              // Make total credit even more prominent
+              if (data.column.index === creditColumnIndex) {
+                data.cell.styles.fillColor = [255, 69, 0]; // Orange red
+                data.cell.styles.textColor = [255, 255, 255]; // White text
+                data.cell.styles.fontSize = 12;
+              }
+            }
+            // Credit column styling for regular rows
+            else if (data.column.index === creditColumnIndex) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fontSize = 11;
+            }
+          },
+          
+          // Add page numbers and footer
+          didDrawPage: function (data) {
+            // Add page numbers
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 100, 100);
+            const pageNum = `Page ${data.pageNumber}`;
+            const pageNumWidth = pdf.getStringUnitWidth(pageNum) * pdf.internal.getFontSize() / pdf.internal.scaleFactor;
+            pdf.text(pageNum, pageWidth - pageNumWidth - 30, pageHeight - 20);
+            
+            // Add footer line
+            pdf.setDrawColor(200, 200, 200);
+            pdf.setLineWidth(0.5);
+            pdf.line(30, pageHeight - 30, pageWidth - 30, pageHeight - 30);
           }
         });
 

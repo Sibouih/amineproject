@@ -147,6 +147,106 @@ class ClientPaymentController extends BaseController
         ]);
     }
 
+    //------------- UPDATE CLIENT PAYMENT -------------\\
+    public function update(Request $request, $id)
+    {
+        $this->authorizeForUser($request->user('api'), 'update', ClientPayment::class);
+
+        $request->validate([
+            'Ref' => 'required|string|max:255',
+            'date' => 'required|date',
+            'client_id' => 'required|exists:clients,id',
+            'montant' => 'required|numeric|min:0',
+            'Reglement' => 'required|string|max:255',
+            'notes' => 'nullable|string'
+        ]);
+
+        $payment = ClientPayment::findOrFail($id);
+        
+        // Store old values for potential rollback
+        $oldAmount = $payment->montant;
+        $oldClientId = $payment->client_id;
+        
+        // Update the payment
+        $payment->update([
+            'Ref' => $request->Ref,
+            'date' => $request->date,
+            'client_id' => $request->client_id,
+            'montant' => $request->montant,
+            'Reglement' => $request->Reglement,
+            'notes' => $request->notes,
+            'user_id' => $request->user('api')->id,
+        ]);
+
+        // If the amount or client changed, we need to update related records
+        if ($oldAmount != $request->montant || $oldClientId != $request->client_id) {
+            // Get all payment sales for this payment
+            $paymentSales = $payment->paymentSales;
+            
+            if ($paymentSales->count() > 0) {
+                // If there are allocations, we need to handle the amount difference
+                $totalAllocated = $paymentSales->sum('montant');
+                $amountDifference = $request->montant - $oldAmount;
+                
+                if ($amountDifference != 0) {
+                    // If the client changed, we need to update all payment sales
+                    if ($oldClientId != $request->client_id) {
+                        // For simplicity, we'll remove all existing allocations
+                        // and let the user re-allocate manually
+                        foreach ($paymentSales as $paymentSale) {
+                            if ($paymentSale->sale_id) {
+                                $sale = $paymentSale->sale;
+                                if ($sale) {
+                                    $sale->paid_amount -= $paymentSale->montant;
+                                    
+                                    // Update payment status
+                                    if ($sale->paid_amount <= 0) {
+                                        $sale->payment_statut = 'unpaid';
+                                    } else if ($sale->paid_amount < $sale->GrandTotal) {
+                                        $sale->payment_statut = 'partial';
+                                    }
+                                    
+                                    $sale->save();
+                                }
+                            }
+                            $paymentSale->delete();
+                        }
+                    } else {
+                        // Same client, just amount changed
+                        // Adjust the first payment sale record with the difference
+                        $firstPaymentSale = $paymentSales->first();
+                        if ($firstPaymentSale && $firstPaymentSale->sale_id) {
+                            $sale = $firstPaymentSale->sale;
+                            if ($sale) {
+                                $sale->paid_amount += $amountDifference;
+                                
+                                // Update payment status
+                                if ($sale->paid_amount <= 0) {
+                                    $sale->payment_statut = 'unpaid';
+                                } else if ($sale->paid_amount >= $sale->GrandTotal) {
+                                    $sale->payment_statut = 'paid';
+                                } else {
+                                    $sale->payment_statut = 'partial';
+                                }
+                                
+                                $sale->save();
+                            }
+                            
+                            $firstPaymentSale->montant += $amountDifference;
+                            $firstPaymentSale->save();
+                        }
+                    }
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment updated successfully',
+            'payment' => $payment->load('client', 'user')
+        ]);
+    }
+
     //------------- DELETE CLIENT PAYMENT -------------\\
     public function destroy(Request $request, $id)
     {

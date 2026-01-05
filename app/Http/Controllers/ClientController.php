@@ -448,7 +448,7 @@ class ClientController extends BaseController
     }
 
     // Method to handle payments for individual sales (DEPRECATED - kept for reference only)
-    protected function createPayment($request, $client_sale = null, $amount, $payment_status, $type = 'commande', $client_payment_id = null) {
+    protected function createPayment($request, $amount, $payment_status, $client_sale = null, $type = 'commande', $client_payment_id = null) {
         // This method is no longer used - payments should be recorded directly in client_payments table
         // and sales/credits should be updated directly
     }
@@ -581,14 +581,14 @@ class ClientController extends BaseController
             $return_due = $total_amount_return - $total_paid_return;
 
             // Calculate total credit (matches the formula in index method)
-            $total_credit = ($client->credit_initial ?? 0) + $due - $return_due;
+            $total_credit = ($client->credit_initial ?? 0) + $due - $total_paid_return;
 
             $item = [
                 'id' => $client->id,
                 'name' => $client->name,
                 'phone' => $client->phone,
                 'city' => $client->city,
-                'total_credit' => $total_credit,
+                'total_credit' => number_format($total_credit, 2),
             ];
 
             $data[] = $item;

@@ -474,6 +474,163 @@ class ReportController extends BaseController
         ]);
     }
 
+    //----------------- Client Payments Report (All Clients) -----------------------\\
+
+    public function client_payments_report(request $request)
+    {
+        $this->authorizeForUser($request->user('api'), 'Reports_customers', Client::class);
+        
+        // How many items do you want to display.
+        $perPage = $request->limit;
+        $pageStart = \Request::get('page', 1);
+        // Start displaying items from this number;
+        $offSet = ($pageStart * $perPage) - $perPage;
+        $order = $request->SortField;
+        $dir = $request->SortType == 'false' ? 'asc' : 'desc';
+        $paymentType = $request->payment_type; // 'global', 'direct', or null for both
+
+        // Build base query for global client payments
+        $globalPaymentsQuery = DB::table('client_payments')
+            ->join('clients', 'client_payments.client_id', '=', 'clients.id')
+            ->where('client_payments.deleted_at', '=', null)
+            ->where('clients.deleted_at', '=', null);
+
+        // Build base query for direct payments (payment_sales)
+        $directPaymentsQuery = DB::table('payment_sales')
+            ->join('sales', 'payment_sales.sale_id', '=', 'sales.id')
+            ->join('clients', 'sales.client_id', '=', 'clients.id')
+            ->where('payment_sales.deleted_at', '=', null)
+            ->where('sales.deleted_at', '=', null)
+            ->where('clients.deleted_at', '=', null)
+            ->whereNull('payment_sales.client_payment_id'); // Only old payments without client_payment_id
+
+        // Apply filters to both queries
+        if ($request->filled('client_id') && $request->client_id != '') {
+            $globalPaymentsQuery->where('client_payments.client_id', $request->client_id);
+            $directPaymentsQuery->where('sales.client_id', $request->client_id);
+        }
+
+        if ($request->filled('Ref') && $request->Ref != '') {
+            $globalPaymentsQuery->where('client_payments.Ref', 'LIKE', "%{$request->Ref}%");
+            $directPaymentsQuery->where('payment_sales.Ref', 'LIKE', "%{$request->Ref}%");
+        }
+
+        if ($request->filled('Reglement') && $request->Reglement != '') {
+            $globalPaymentsQuery->where('client_payments.Reglement', 'LIKE', "%{$request->Reglement}%");
+            $directPaymentsQuery->where('payment_sales.Reglement', 'LIKE', "%{$request->Reglement}%");
+        }
+
+        if ($request->filled('from') && $request->from != '') {
+            $globalPaymentsQuery->where('client_payments.date', '>=', $request->from);
+            $directPaymentsQuery->where('payment_sales.date', '>=', $request->from);
+        }
+
+        if ($request->filled('to') && $request->to != '') {
+            $globalPaymentsQuery->where('client_payments.date', '<=', $request->to);
+            $directPaymentsQuery->where('payment_sales.date', '<=', $request->to);
+        }
+
+        // Apply search to both queries
+        if ($request->filled('search') && $request->search != '') {
+            $globalPaymentsQuery->where(function ($query) use ($request) {
+                $query->where('client_payments.Ref', 'LIKE', "%{$request->search}%")
+                      ->orWhere('clients.name', 'LIKE', "%{$request->search}%")
+                      ->orWhere('client_payments.Reglement', 'LIKE', "%{$request->search}%");
+            });
+            
+            $directPaymentsQuery->where(function ($query) use ($request) {
+                $query->where('payment_sales.Ref', 'LIKE', "%{$request->search}%")
+                      ->orWhere('clients.name', 'LIKE', "%{$request->search}%")
+                      ->orWhere('payment_sales.Reglement', 'LIKE', "%{$request->search}%")
+                      ->orWhere('sales.Ref', 'LIKE', "%{$request->search}%");
+            });
+        }
+
+        // Get totals for both payment types
+        $globalPaymentsTotal = clone $globalPaymentsQuery;
+        $directPaymentsTotal = clone $directPaymentsQuery;
+        
+        $globalPaymentsCount = $globalPaymentsQuery->count();
+        $directPaymentsCount = $directPaymentsQuery->count();
+        $totalRows = $globalPaymentsCount + $directPaymentsCount;
+
+        $globalPaymentsTotalAmount = $globalPaymentsTotal->sum('client_payments.montant');
+        $directPaymentsTotalAmount = $directPaymentsTotal->sum('payment_sales.montant');
+        $totalAmount = $globalPaymentsTotalAmount + $directPaymentsTotalAmount;
+
+        // Apply pagination
+        if ($perPage == "-1") {
+            $perPage = $totalRows;
+        }
+
+        // Initialize results
+        $globalPayments = collect();
+        $directPayments = collect();
+
+        // Get payments based on type requested
+        if (!$paymentType || $paymentType === 'global') {
+            $globalPayments = $globalPaymentsQuery
+                ->select(
+                    'client_payments.id',
+                    'client_payments.date',
+                    'client_payments.Ref',
+                    'client_payments.Reglement',
+                    'client_payments.montant',
+                    'client_payments.notes',
+                    'clients.name as client_name',
+                    'clients.id as client_id',
+                    DB::raw("'global' as payment_type")
+                )
+                ->orderBy($order ?: 'client_payments.id', $dir)
+                ->skip($paymentType === 'global' ? $offSet : 0)
+                ->take($paymentType === 'global' ? $perPage : $globalPaymentsCount)
+                ->get();
+        }
+
+        if (!$paymentType || $paymentType === 'direct') {
+            $directPayments = $directPaymentsQuery
+                ->select(
+                    'payment_sales.id',
+                    'payment_sales.date',
+                    'payment_sales.Ref',
+                    'payment_sales.Reglement',
+                    'payment_sales.montant',
+                    'payment_sales.notes',
+                    'clients.name as client_name',
+                    'clients.id as client_id',
+                    'sales.Ref as sale_ref',
+                    'payment_sales.sale_id',
+                    DB::raw("'direct' as payment_type")
+                )
+                ->orderBy($order ?: 'payment_sales.id', $dir)
+                ->skip($paymentType === 'direct' ? $offSet : 0)
+                ->take($paymentType === 'direct' ? $perPage : $directPaymentsCount)
+                ->get();
+        }
+
+        // Get all clients for filter dropdown
+        $clients = DB::table('clients')
+            ->where('deleted_at', '=', null)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'globalPayments' => $globalPayments,
+            'directPayments' => $directPayments,
+            'clients' => $clients,
+            'sales' => [], // Keep for compatibility
+            'totalRows' => $totalRows,
+            'globalPaymentsCount' => $globalPaymentsCount,
+            'directPaymentsCount' => $directPaymentsCount,
+            'globalPaymentsTotalAmount' => $globalPaymentsTotalAmount,
+            'directPaymentsTotalAmount' => $directPaymentsTotalAmount,
+            'totalAmount' => $totalAmount,
+            // Keep for backward compatibility
+            'payments' => $globalPayments->merge($directPayments)
+        ]);
+    }
+
     //-------------------- Get Payment Details -------------\\
 
     public function Payment_Detail(request $request, $id)
@@ -2439,10 +2596,88 @@ class ReportController extends BaseController
              $average_cost = $total_cost / $total_quantity;
          }
  
-         return $average_cost;
-     }
+                 return $average_cost;
+    }
 
-     // Calculate the real cost of goods sold without using averages
+    public function getProductPurchaseCost($product_id, $product_variant_id, $quantity, $warehouse_id, $sale_date)
+    {
+        // Get the product's base cost as fallback
+        $product = Product::find($product_id);
+        $base_cost = $product ? $product->cost : 0;
+        
+        // Get all purchases for this product up to the sale date, ordered by date (FIFO)
+        $purchases = PurchaseDetail::join('purchases', 'purchases.id', '=', 'purchase_details.purchase_id')
+            ->where('product_id', $product_id)
+            ->where('purchases.statut', 'received')
+            ->where('purchases.warehouse_id', $warehouse_id)
+            ->where('purchases.date', '<=', $sale_date)
+            ->orderBy('purchases.date', 'asc')
+            ->select(
+                'purchase_details.quantity',
+                'purchase_details.cost',
+                'purchase_details.TaxNet',
+                'purchase_details.tax_method',
+                'purchase_details.discount',
+                'purchase_details.discount_method',
+                'purchases.date'
+            )
+            ->get();
+            
+        if ($purchases->isEmpty()) {
+            // No purchases found, return base cost
+            return $quantity * $base_cost;
+        }
+        
+        // Build available stock from purchases (FIFO)
+        $available_stock = [];
+        foreach ($purchases as $purchase) {
+            $actual_cost = $purchase->cost;
+            
+            // Apply tax if tax method is exclusive (1)
+            if ($purchase->tax_method == 1) {
+                $actual_cost += ($actual_cost * $purchase->TaxNet / 100);
+            }
+            
+            // Apply discount
+            if ($purchase->discount_method == 1) { // Percentage
+                $actual_cost -= ($actual_cost * $purchase->discount / 100);
+            } else if ($purchase->discount_method == 2) { // Fixed amount
+                $actual_cost -= $purchase->discount;
+            }
+            
+            $available_stock[] = [
+                'quantity' => $purchase->quantity,
+                'cost' => $actual_cost,
+                'remaining' => $purchase->quantity
+            ];
+        }
+        
+        // Calculate cost using FIFO method
+        $total_cost = 0;
+        $remaining_quantity = $quantity;
+        
+        foreach ($available_stock as &$stock) {
+            if ($remaining_quantity <= 0) {
+                break;
+            }
+            
+            $quantity_to_take = min($remaining_quantity, $stock['remaining']);
+            if ($quantity_to_take > 0) {
+                $total_cost += $quantity_to_take * $stock['cost'];
+                $stock['remaining'] -= $quantity_to_take;
+                $remaining_quantity -= $quantity_to_take;
+            }
+        }
+        
+        // If we couldn't match all quantity with purchases, use base cost for remainder
+        if ($remaining_quantity > 0) {
+            $total_cost += $remaining_quantity * $base_cost;
+        }
+        
+        return $total_cost;
+    }
+
+    // Calculate the real cost of goods sold without using averages
      public function CalculeRealCosts($start_date, $end_date, $warehouse_id, $array_warehouses_id)
      {
          // Initialize variable to store total real costs for all products
@@ -2578,11 +2813,67 @@ class ReportController extends BaseController
              }
          }
          
-         return $total_real_costs;
-     }
+                 return $total_real_costs;
+    }
+
+    public function CalculeReturnSalesProfit($start_date, $end_date, $warehouse_id, $array_warehouses_id)
+    {
+        // Initialize variable to store total profit lost from returns
+        $total_return_profit = 0;
+        
+        // Get all sale return details in the period
+        $sale_return_details = SaleReturnDetails::with(['SaleReturn', 'product'])
+            ->where(function ($query) use ($warehouse_id, $array_warehouses_id, $start_date, $end_date) {
+                if ($warehouse_id !== 0) {
+                    return $query->whereHas('SaleReturn', function ($q) use ($warehouse_id, $start_date, $end_date) {
+                        $q->where('warehouse_id', $warehouse_id)
+                          ->where('statut', 'received')
+                          ->whereBetween('date', array($start_date, $end_date));
+                    });
+                } else {
+                    return $query->whereHas('SaleReturn', function ($q) use ($array_warehouses_id, $start_date, $end_date) {
+                        $q->whereIn('warehouse_id', $array_warehouses_id)
+                          ->where('statut', 'received')
+                          ->whereBetween('date', array($start_date, $end_date));
+                    });
+                }
+            })
+            ->get();
+            
+        // Calculate profit lost for each returned item
+        foreach ($sale_return_details as $return_detail) {
+            // Get the product
+            $product = $return_detail->product;
+            
+            if ($product) {
+                // Calculate the profit lost: (sale price - cost) * quantity returned
+                $sale_price = $return_detail->price;
+                $cost = $product->cost;
+                $quantity = $return_detail->quantity;
+                
+                // Apply tax if tax method is exclusive (1)
+                if ($return_detail->tax_method == 1) {
+                    $sale_price += ($sale_price * $return_detail->TaxNet / 100);
+                }
+                
+                // Apply discount
+                if ($return_detail->discount_method == 1) { // Percentage
+                    $sale_price -= ($sale_price * $return_detail->discount / 100);
+                } else if ($return_detail->discount_method == 2) { // Fixed amount
+                    $sale_price -= $return_detail->discount;
+                }
+                
+                // Calculate profit lost for this return
+                $profit_lost = ($sale_price - $cost) * $quantity;
+                $total_return_profit += $profit_lost;
+            }
+        }
+        
+        return $total_return_profit;
+    }
 
 
-     //-------------------- report_top_products -------------\\
+    //-------------------- report_top_products -------------\\
 
      public function report_top_products(request $request)
      {
