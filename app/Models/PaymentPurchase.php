@@ -11,13 +11,14 @@ class PaymentPurchase extends Model
     protected $dates = ['deleted_at'];
 
     protected $fillable = [
-        'purchase_id', 'date', 'montant','change', 'Ref', 'Reglement', 'user_id', 'notes','account_id', 'type_credit'
+        'purchase_id', 'provider_id', 'date', 'montant','change', 'Ref', 'Reglement', 'user_id', 'notes','account_id', 'type_credit'
     ];
 
     protected $casts = [
         'montant' => 'double',
         'change'  => 'double',
         'purchase_id' => 'integer',
+        'provider_id' => 'integer',
         'user_id' => 'integer',
         'account_id' => 'integer',
     ];
@@ -35,6 +36,11 @@ class PaymentPurchase extends Model
     public function purchase()
     {
         return $this->belongsTo('App\Models\Purchase');
+    }
+
+    public function provider()
+    {
+        return $this->belongsTo('App\Models\Provider');
     }
 
 }

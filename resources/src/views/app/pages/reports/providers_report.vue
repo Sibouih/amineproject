@@ -119,10 +119,10 @@ export default {
           sortable: false
         },
         {
-          label: this.$t("Total_Purchase_Due"),
-          field: "due",
+          label: this.$t("Total_Purchase_Return_Due"),
+          field: "return_Due",
           type: "decimal",
-          headerField: this.sumCount3,
+          headerField: this.sumCount4,
           tdClass: "text-left",
           thClass: "text-left",
           sortable: false
@@ -134,15 +134,6 @@ export default {
           tdClass: "text-left",
           thClass: "text-left",
           headerField: this.sumTotalCredit,
-          sortable: false
-        },
-        {
-          label: this.$t("Total_Purchase_Return_Due"),
-          field: "return_Due",
-          type: "decimal",
-          headerField: this.sumCount4,
-          tdClass: "text-left",
-          thClass: "text-left",
           sortable: false
         },
         {

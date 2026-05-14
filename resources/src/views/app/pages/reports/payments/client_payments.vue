@@ -1460,9 +1460,9 @@ export default {
     get_data_loaded() {
       if (this.today_mode) {
         let today = new Date()
-        this.startDate = today.getFullYear();
+        this.startDate = today.getFullYear() + '-01-01';
         this.endDate = new Date().toJSON().slice(0, 10);
-        this.dateRange.startDate = today.getFullYear();
+        this.dateRange.startDate = today.getFullYear() + '-01-01';
         this.dateRange.endDate = new Date().toJSON().slice(0, 10);
       }
     },

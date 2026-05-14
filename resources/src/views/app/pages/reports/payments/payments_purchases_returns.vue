@@ -375,10 +375,10 @@ export default {
       if (self.today_mode) {
         let today = new Date()
 
-        self.startDate = today.getFullYear();
+        self.startDate = today.getFullYear() + '-01-01';
         self.endDate = new Date().toJSON().slice(0, 10);
 
-        self.dateRange.startDate = today.getFullYear();
+        self.dateRange.startDate = today.getFullYear() + '-01-01';
         self.dateRange.endDate = new Date().toJSON().slice(0, 10);
         
       }

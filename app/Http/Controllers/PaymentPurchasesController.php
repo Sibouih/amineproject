@@ -55,7 +55,7 @@ class PaymentPurchasesController extends BaseController
         $data = array();
 
         // Check If User Has Permission View  All Records
-        $Payments = PaymentPurchase::with('purchase.provider','account')
+        $Payments = PaymentPurchase::with('purchase.provider', 'provider', 'account')
             ->where('deleted_at', '=', null)
             ->whereBetween('date', array($request->from, $request->to))
             ->where(function ($query) use ($view_records) {
@@ -63,11 +63,14 @@ class PaymentPurchasesController extends BaseController
                     return $query->where('user_id', '=', Auth::user()->id);
                 }
             })
-        // Multiple Filter
+        // Multiple Filter - handle both purchase.provider and direct provider
             ->where(function ($query) use ($request) {
                 return $query->when($request->filled('provider_id'), function ($query) use ($request) {
-                    return $query->whereHas('purchase.provider', function ($q) use ($request) {
-                        $q->where('id', '=', $request->provider_id);
+                    return $query->where(function ($q) use ($request) {
+                        $q->where('provider_id', '=', $request->provider_id)
+                          ->orWhereHas('purchase', function ($subQ) use ($request) {
+                              $subQ->where('provider_id', '=', $request->provider_id);
+                          });
                     });
                 });
             });
@@ -87,6 +90,11 @@ class PaymentPurchasesController extends BaseController
                             return $query->whereHas('purchase.provider', function ($q) use ($request) {
                                 $q->where('name', 'LIKE', "%{$request->search}%");
                             });
+                        })
+                        ->orWhere(function ($query) use ($request) {
+                            return $query->whereHas('provider', function ($q) use ($request) {
+                                $q->where('name', 'LIKE', "%{$request->search}%");
+                            });
                         });
                 });
             });
@@ -101,14 +109,24 @@ class PaymentPurchasesController extends BaseController
             ->get();
 
         foreach ($Payments as $Payment) {
-
             $item['date']          = $Payment->date;
             $item['Ref']           = $Payment->Ref;
-            $item['Ref_Purchase']  = $Payment['purchase']->Ref;
-            $item['provider_name'] = $Payment['purchase']['provider']->name;
+            
+            // Handle both purchase-linked and provider-linked payments
+            if ($Payment->purchase_id && $Payment['purchase']) {
+                $item['Ref_Purchase']  = $Payment['purchase']->Ref;
+                $item['provider_name'] = $Payment['purchase']['provider'] ? $Payment['purchase']['provider']->name : '---';
+            } else if ($Payment->provider_id && $Payment['provider']) {
+                $item['Ref_Purchase']  = '---';
+                $item['provider_name'] = $Payment['provider']->name;
+            } else {
+                $item['Ref_Purchase']  = '---';
+                $item['provider_name'] = '---';
+            }
+            
             $item['Reglement']     = $Payment->Reglement;
             $item['montant']       = $Payment->montant;
-            $item['account_name']  = $Payment['account']?$Payment['account']->account_name:'---';
+            $item['account_name']  = $Payment['account'] ? $Payment['account']->account_name : '---';
             $data[] = $item;
         }
 
@@ -340,13 +358,29 @@ class PaymentPurchasesController extends BaseController
 
     public function Payment_purchase_pdf(Request $request, $id)
     {
-        $payment = PaymentPurchase::with('purchase', 'purchase.provider')->findOrFail($id);
+        $payment = PaymentPurchase::with('purchase', 'purchase.provider', 'provider')->findOrFail($id);
 
-        $payment_data['purchase_Ref'] = $payment['purchase']->Ref;
-        $payment_data['supplier_name'] = $payment['purchase']['provider']->name;
-        $payment_data['supplier_phone'] = $payment['purchase']['provider']->phone;
-        $payment_data['supplier_adr'] = $payment['purchase']['provider']->adresse;
-        $payment_data['supplier_email'] = $payment['purchase']['provider']->email;
+        // Handle both purchase-linked and provider-linked payments
+        if ($payment->purchase_id && $payment['purchase']) {
+            $payment_data['purchase_Ref'] = $payment['purchase']->Ref;
+            $payment_data['supplier_name'] = $payment['purchase']['provider']->name;
+            $payment_data['supplier_phone'] = $payment['purchase']['provider']->phone;
+            $payment_data['supplier_adr'] = $payment['purchase']['provider']->adresse;
+            $payment_data['supplier_email'] = $payment['purchase']['provider']->email;
+        } else if ($payment->provider_id && $payment['provider']) {
+            $payment_data['purchase_Ref'] = '---';
+            $payment_data['supplier_name'] = $payment['provider']->name;
+            $payment_data['supplier_phone'] = $payment['provider']->phone;
+            $payment_data['supplier_adr'] = $payment['provider']->adresse;
+            $payment_data['supplier_email'] = $payment['provider']->email;
+        } else {
+            $payment_data['purchase_Ref'] = '---';
+            $payment_data['supplier_name'] = '---';
+            $payment_data['supplier_phone'] = '';
+            $payment_data['supplier_adr'] = '';
+            $payment_data['supplier_email'] = '';
+        }
+        
         $payment_data['montant'] = $payment->montant;
         $payment_data['Ref'] = $payment->Ref;
         $payment_data['date'] = $payment->date;
@@ -384,7 +418,7 @@ class PaymentPurchasesController extends BaseController
         $this->authorizeForUser($request->user('api'), 'view', PaymentPurchase::class);
 
         //PaymentPurchase
-        $payment = PaymentPurchase::with('purchase.provider')->findOrFail($request->id);
+        $payment = PaymentPurchase::with('purchase.provider', 'provider')->findOrFail($request->id);
 
         $helpers = new helpers();
         $currency = $helpers->Get_Currency();
@@ -408,11 +442,18 @@ class PaymentPurchasesController extends BaseController
 
         $total_amount =  $currency .' '.number_format($payment->montant, 2, '.', ',');
         
-        $contact_name = $payment['purchase']['provider']->name;
+        // Handle both purchase-linked and provider-linked payments
+        if ($payment->purchase_id && $payment['purchase'] && $payment['purchase']['provider']) {
+            $contact_name = $payment['purchase']['provider']->name;
+            $receiver_email = $payment['purchase']['provider']->email;
+        } else if ($payment->provider_id && $payment['provider']) {
+            $contact_name = $payment['provider']->name;
+            $receiver_email = $payment['provider']->email;
+        } else {
+            return response()->json(['message' => 'No provider found for this payment'], 400);
+        }
+        
         $business_name = $settings->CompanyName;
-
-        //receiver email
-        $receiver_email = $payment['purchase']['provider']->email;
 
         //replace the text with tags
         $message_body = str_replace('{contact_name}', $contact_name, $message_body);
@@ -439,7 +480,7 @@ class PaymentPurchasesController extends BaseController
         $this->authorizeForUser($request->user('api'), 'view', PaymentPurchase::class);
 
         //PaymentPurchase
-        $payment = PaymentPurchase::with('purchase.provider')->findOrFail($request->id);
+        $payment = PaymentPurchase::with('purchase.provider', 'provider')->findOrFail($request->id);
 
         //settings
         $settings = Setting::where('deleted_at', '=', null)->first();
@@ -463,11 +504,18 @@ class PaymentPurchasesController extends BaseController
 
         $total_amount =  $currency .' '.number_format($payment->montant, 2, '.', ',');
         
-        $contact_name = $payment['purchase']['provider']->name;
+        // Handle both purchase-linked and provider-linked payments
+        if ($payment->purchase_id && $payment['purchase'] && $payment['purchase']['provider']) {
+            $contact_name = $payment['purchase']['provider']->name;
+            $receiverNumber = $payment['purchase']['provider']->phone;
+        } else if ($payment->provider_id && $payment['provider']) {
+            $contact_name = $payment['provider']->name;
+            $receiverNumber = $payment['provider']->phone;
+        } else {
+            return response()->json(['message' => 'No provider found for this payment'], 400);
+        }
+        
         $business_name = $settings->CompanyName;
-
-        //receiver phone
-        $receiverNumber = $payment['purchase']['provider']->phone;
 
         //replace the text with tags
         $message_text = str_replace('{contact_name}', $contact_name, $message_text);

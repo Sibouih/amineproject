@@ -1019,6 +1019,16 @@ const baseRoutes = [
                     },
 
                     {
+                        name: "provider_payments",
+                        path: "provider_payments",
+                        component: () =>
+                            import(
+                                /* webpackChunkName: "provider_payments" */
+                                "./views/app/pages/reports/payments/provider_payments"
+                            )
+                    },
+
+                    {
                         name: "profit_and_loss",
                         path: "profit_and_loss",
                         component: () =>

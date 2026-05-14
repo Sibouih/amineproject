@@ -114,7 +114,7 @@ class ClientController extends BaseController
                 ->where('deleted_at',  '=', null)
                 ->sum('paid_amount');
 
-            $item['return_Due'] = $item['total_amount_return'] - $item['total_paid_return'];
+            $item['return_Due'] = $item['total_amount_return'];
 
             $item['id'] = $client->id;
             $item['name'] = $client->name;
@@ -375,73 +375,36 @@ class ClientController extends BaseController
                 }
             }
 
-            $client = Client::where('deleted_at', '=', null)->where('id', '=', $request->client_id)->first();
             $paid_amount_total = $request->amount;
 
-            // Handle payment based on the type
-            if ($request->type == 'credit_initial_only') {
-                // Just apply to initial credit
-                if ($paid_amount_total > $client->credit_initial) {
-                    $client->credit_initial = 0;
+            // Apply payment to sales - update paid amounts on individual sales
+            // Note: credit_initial is NOT modified by payments - it's a static initial credit value
+            $client_sales_due = Sale::where('deleted_at', '=', null)
+                ->where([
+                    ['payment_statut', '!=', 'paid'],
+                    ['client_id', $request->client_id]
+                ])->get();
+
+            foreach($client_sales_due as $key => $client_sale){
+                if($paid_amount_total == 0)
+                    break;
+                
+                $due = $client_sale->GrandTotal - $client_sale->paid_amount;
+
+                if($paid_amount_total >= $due){
+                    $amount = $due;
+                    $payment_status = 'paid';
                 } else {
-                    $client->credit_initial = $client->credit_initial - $paid_amount_total;
-                }
-                $client->save();
-            } 
-            else if ($request->type == 'credit_ventes_only' || $request->type == 'credit_initial_first' || $request->type == 'credit_ventes_first') {
-                // Apply to sales if selected
-                if ($request->type == 'credit_initial_first') {
-                    // First handle the initial credit
-                    if ($paid_amount_total > $client->credit_initial) {
-                        $paid_amount_total = $paid_amount_total - $client->credit_initial;
-                        $client->credit_initial = 0;
-                    } else {
-                        $client->credit_initial = $client->credit_initial - $paid_amount_total;
-                        $paid_amount_total = 0;
-                    }
-                    $client->save();
+                    $amount = $paid_amount_total;
+                    $payment_status = 'partial';
                 }
 
-                // Apply the rest to sales if there's still an amount to pay
-                if ($paid_amount_total > 0) {
-                    $client_sales_due = Sale::where('deleted_at', '=', null)
-                        ->where([
-                            ['payment_statut', '!=', 'paid'],
-                            ['client_id', $request->client_id]
-                        ])->get();
+                // Update the sale's paid amount directly
+                $client_sale->paid_amount += $amount;
+                $client_sale->payment_statut = $payment_status;
+                $client_sale->save();
 
-                    foreach($client_sales_due as $key => $client_sale){
-                        if($paid_amount_total == 0)
-                            break;
-                        
-                        $due = $client_sale->GrandTotal - $client_sale->paid_amount;
-
-                        if($paid_amount_total >= $due){
-                            $amount = $due;
-                            $payment_status = 'paid';
-                        } else {
-                            $amount = $paid_amount_total;
-                            $payment_status = 'partial';
-                        }
-
-                        // Update the sale's paid amount directly
-                        $client_sale->paid_amount += $amount;
-                        $client_sale->payment_statut = $payment_status;
-                        $client_sale->save();
-
-                        $paid_amount_total -= $amount;
-                    }
-                }
-
-                // If amount still remains and we're handling credit_ventes_first, apply to initial credit
-                if ($paid_amount_total > 0 && $request->type == 'credit_ventes_first') {
-                    if ($paid_amount_total > $client->credit_initial) {
-                        $client->credit_initial = 0;
-                    } else {
-                        $client->credit_initial = $client->credit_initial - $paid_amount_total;
-                    }
-                    $client->save();
-                }
+                $paid_amount_total -= $amount;
             }
         }
         return response()->json(['success' => true]);

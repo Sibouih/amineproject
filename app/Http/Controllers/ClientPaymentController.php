@@ -271,14 +271,8 @@ class ClientPaymentController extends BaseController
                     
                     $sale->save();
                 }
-            } else if ($paymentSale->type_credit == 'credit_initial' && $paymentSale->client_id) {
-                // If this payment was for an initial credit, add it back to the client
-                $client = Client::find($paymentSale->client_id);
-                if ($client) {
-                    $client->credit_initial += $paymentSale->montant;
-                    $client->save();
-                }
             }
+            // Note: credit_initial is NOT modified by payments - it's a static initial credit value
             
             // Delete the payment sale record
             $paymentSale->delete();

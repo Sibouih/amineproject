@@ -258,7 +258,7 @@
         hide-footer
         size="md"
         id="modal_Pay_due"
-        title="$t('Pay_Due')"
+        :title="$t('Pay_Due')"
       >
         <b-form @submit.prevent="Submit_Payment_Purchase_due">
           <b-row>
@@ -273,7 +273,13 @@
                     v-model="payment.due_type"
                     :reduce="label => label.value"
                     :placeholder="$t('PleaseSelect')"                    
-                    :options="paymentOptions"                          
+                    :options="
+                          [
+                          {label: $t('Seulement_credit_initial'), value: 'credit_initial_only'},
+                          {label: $t('Seulement_credit_achats'), value: 'credit_achats_only'},
+                          {label: $t('Credit_achats_apres_credit_initial'), value: 'credit_achats_first'},
+                          {label: $t('Credit_initial_apres_credit_achats'), value: 'credit_initial_first'},
+                          ]"                          
                   ></v-select>
                   <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
@@ -331,24 +337,7 @@
                   <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
               </validation-provider>
-            </b-col>
-
-               <!-- Account -->
-               <b-col lg="6" md="6" sm="12">
-              <validation-provider name="Account">
-                <b-form-group slot-scope="{ valid, errors }" :label="$t('Account')">
-                  <v-select
-                    :class="{'is-invalid': !!errors.length}"
-                    :state="errors[0] ? false : (valid ? true : null)"
-                    v-model="payment.account_id"
-                    :reduce="label => label.value"
-                    :placeholder="$t('Choose_Account')"
-                    :options="accounts.map(accounts => ({label: accounts.account_name, value: accounts.id}))"
-                  />
-                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
-                </b-form-group>
-              </validation-provider>
-            </b-col>
+            </b-col>              
 
             <!-- Note -->
             <b-col lg="12" md="12" sm="12" class="mt-3">
@@ -431,24 +420,7 @@
                   <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
                 </b-form-group>
               </validation-provider>
-            </b-col>
-
-               <!-- Account -->
-               <b-col lg="6" md="6" sm="12">
-              <validation-provider name="Account">
-                <b-form-group slot-scope="{ valid, errors }" :label="$t('Account')">
-                  <v-select
-                    :class="{'is-invalid': !!errors.length}"
-                    :state="errors[0] ? false : (valid ? true : null)"
-                    v-model="payment_return.account_id"
-                    :reduce="label => label.value"
-                    :placeholder="$t('Choose_Account')"
-                    :options="accounts.map(accounts => ({label: accounts.account_name, value: accounts.id}))"
-                  />
-                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
-                </b-form-group>
-              </validation-provider>
-            </b-col>
+            </b-col>               
 
             <!-- Note -->
             <b-col lg="12" md="12" sm="12" class="mt-3">
@@ -833,20 +805,12 @@ export default {
       ];
     },
     paymentOptions() {
-      const baseOptions = [
+      return [
+        {label: this.$t('Seulement_credit_initial'), value: 'credit_initial_only'},
         {label: this.$t('Seulement_credit_achats'), value: 'credit_achats_only'},
+        {label: this.$t('Credit_achats_apres_credit_initial'), value: 'credit_achats_first'},
+        {label: this.$t('Credit_initial_apres_credit_achats'), value: 'credit_initial_first'},
       ];
-
-      if (this.payment.credit_initial > 0) {
-        return [
-          {label: this.$t('Seulement_credit_initial'), value: 'credit_initial_only'},
-          ...baseOptions,
-          {label: this.$t('Credit_achats_apres_credit_initial'), value: 'credit_achats_first'},
-          {label: this.$t('Credit_initial_apres_credit_achats'), value: 'credit_initial_first'},
-        ];
-      }
-
-      return baseOptions;
     }
   },
 
@@ -1319,7 +1283,7 @@ export default {
       this.payment.provider_name = row.name;
       this.payment.due = row.due;
       this.payment.credit_initial = row.credit_initial;
-      this.payment.total_credit = row.credit_initial + row.due;
+      this.payment.total_credit = row.total_credit;
       this.payment.account_id = null;
       this.payment.date = new Date().toISOString().slice(0, 10);
       setTimeout(() => {

@@ -44,7 +44,7 @@
             <p class="text-muted mt-2 mb-0">{{$t('Due')}}</p>
             <p
               class="text-primary text-24 line-height-1 mb-2"
-            >{{currentUser.currency}} {{formatNumber((provider.due),2)}}</p>
+            >{{currentUser.currency}} {{formatNumber((provider.total_credit),2)}}</p>
           </div>
         </b-card>
       </b-col>
@@ -115,8 +115,18 @@
                   </div>
                 </template>
               </vue-good-table>
+              <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                <div class="row">
+                  <div class="col-md-8">
+                    <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                  </div>
+                  <div class="col-md-4 text-right">
+                    <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(purchasesTotal, 2) }}</strong>
+                  </div>
+                </div>
+              </div>
             </b-tab>
-            
+
             <!-- Returns Table -->
             <b-tab :title="$t('Returns')">
               <vue-good-table
@@ -181,10 +191,20 @@
                   </div>
                 </template>
               </vue-good-table>
+              <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                <div class="row">
+                  <div class="col-md-8">
+                    <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                  </div>
+                  <div class="col-md-4 text-right">
+                    <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(returnsTotal, 2) }}</strong>
+                  </div>
+                </div>
+              </div>
             </b-tab>
-            
-            <!-- Payments Table -->
-            <b-tab :title="$t('PurchaseInvoice')">
+
+            <!-- Direct Payments Table -->
+            <b-tab :title="$t('ProviderDirectPayments')">
               <vue-good-table
                 mode="remote"
                 :columns="columns_payments"
@@ -202,7 +222,7 @@
                   mode: 'records',
                   nextLabel: 'next',
                   prevLabel: 'prev',
-        perPageDropdown: [10, 25, 50, 100, 250, 500],
+                  perPageDropdown: [10, 25, 50, 100, 250, 500],
                 }"
                 styleClass="tableOne table-hover vgt-table"
               >
@@ -212,6 +232,57 @@
                 </b-button>
               </div>
               </vue-good-table>
+              <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                <div class="row">
+                  <div class="col-md-8">
+                    <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                  </div>
+                  <div class="col-md-4 text-right">
+                    <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(directPaymentsTotal, 2) }}</strong>
+                  </div>
+                </div>
+              </div>
+            </b-tab>
+
+            <!-- Global Payments Table -->
+            <b-tab :title="$t('ProviderGlobalPayments')">
+              <vue-good-table
+                mode="remote"
+                :columns="columns_global_payments"
+                :totalRows="totalRows_global_payments"
+                :rows="global_payments"
+                @on-page-change="PageChangeGlobalPayments"
+                @on-per-page-change="onPerPageChangeGlobalPayments"
+                @on-search="onSearch_global_payments"
+                :search-options="{
+                  placeholder: $t('Search_this_table'),
+                  enabled: true,
+                }"
+                :pagination-options="{
+                  enabled: true,
+                  mode: 'records',
+                  nextLabel: 'next',
+                  prevLabel: 'prev',
+                  perPageDropdown: [10, 25, 50, 100, 250, 500],
+                }"
+                styleClass="tableOne table-hover vgt-table"
+              >
+               <div slot="table-actions" class="mt-2 mb-3">
+                <b-button @click="GlobalPayments_PDF()" size="sm" variant="outline-success ripple m-1">
+                  <i class="i-File-Copy"></i> PDF
+                </b-button>
+              </div>
+              </vue-good-table>
+              <div class="table-total-footer" style="border: 1px solid #dee2e6; border-top: 2px solid #28a745; background-color: #f8f9fa; padding: 12px 15px; margin-top: 10px; border-radius: 4px;">
+                <div class="row">
+                  <div class="col-md-8">
+                    <strong style="font-size: 16px; color: #495057;">{{ $t('Total') }}</strong>
+                  </div>
+                  <div class="col-md-4 text-right">
+                    <strong style="font-size: 16px; color: #28a745;">{{ currentUser.currency }} {{ formatNumber(globalPaymentsTotal, 2) }}</strong>
+                  </div>
+                </div>
+              </div>
             </b-tab>
           </b-tabs>
         </b-card>
@@ -231,20 +302,25 @@ export default {
       totalRows_purchases: "",
       totalRows_returns: "",
       totalRows_payments: "",
+      totalRows_global_payments: "",
       limit_returns: "10",
       limit_purchases: "10",
       limit_payments: "10",
+      limit_global_payments: "10",
       purchases_page: 1,
       Return_page: 1,
       Payment_page: 1,
+      Global_Payment_page: 1,
       isLoading: true,
       returns_supplier: [],
       payments: [],
       purchases: [],
+      global_payments: [],
 
       search_purchases:"",
       search_payments:"",
       search_return_purchases:"",
+      search_global_payments:"",
 
       provider: {
         id: "",
@@ -252,13 +328,66 @@ export default {
         total_purchase: 0,
         total_amount: 0,
         total_paid: 0,
-        due: 0
+        due: 0,
+        total_credit: 0
       }
     };
   },
 
   computed: {
     ...mapGetters(["currentUser"]),
+    purchasesTotal() {
+      return this.purchases.reduce((total, item) => total + parseFloat(item.GrandTotal || 0), 0);
+    },
+    returnsTotal() {
+      return this.returns_supplier.reduce((total, item) => total + parseFloat(item.GrandTotal || 0), 0);
+    },
+    directPaymentsTotal() {
+      return this.payments.reduce((total, item) => total + parseFloat(item.montant || 0), 0);
+    },
+    globalPaymentsTotal() {
+      return this.global_payments.reduce((total, item) => total + parseFloat(item.montant || 0), 0);
+    },
+    columns_global_payments() {
+      return [
+        {
+          label: this.$t("date"),
+          field: "date",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Reference"),
+          field: "Ref",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Supplier"),
+          field: "provider_name",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("ModePaiement"),
+          field: "Reglement",
+          tdClass: "text-left",
+          thClass: "text-left",
+          sortable: false
+        },
+        {
+          label: this.$t("Amount"),
+          field: "montant",
+          tdClass: "text-left",
+          thClass: "text-left",
+          type: "decimal",
+          sortable: false
+        }
+      ];
+    },
     columns_purchases() {
       return [
         {
@@ -661,6 +790,62 @@ export default {
           this.totalRows_returns = response.data.totalRows;
         })
         .catch(response => {});
+    },
+
+    //--------------------------- Event Page Change Global Payments -------------\\
+    PageChangeGlobalPayments({ currentPage }) {
+      if (this.Global_Payment_page !== currentPage) {
+        this.Get_GlobalPayments(currentPage);
+      }
+    },
+
+    //--------------------------- Limit Page Global Payments -------------\\
+    onPerPageChangeGlobalPayments({ currentPerPage }) {
+      if (this.limit_global_payments !== currentPerPage) {
+        this.limit_global_payments = currentPerPage;
+        this.Get_GlobalPayments(1);
+      }
+    },
+
+    onSearch_global_payments(value) {
+      this.search_global_payments = value.searchTerm;
+      this.Get_GlobalPayments(1);
+    },
+
+    //--------------------------- Get Global Payments By Provider -------------\\
+    Get_GlobalPayments(page) {
+      axios
+        .get(
+          "/report/provider_global_payments?page=" +
+            page +
+            "&limit=" +
+            this.limit_global_payments +
+            "&search=" +
+            this.search_global_payments +
+            "&id=" +
+            this.$route.params.id
+        )
+        .then(response => {
+          this.global_payments = response.data.global_payments;
+          this.totalRows_global_payments = response.data.totalRows;
+        })
+        .catch(response => {});
+    },
+
+    //----------------------------------- Global Payments PDF ------------------------------\\
+    GlobalPayments_PDF() {
+      var self = this;
+      let pdf = new jsPDF("p", "pt");
+      let columns = [
+        { title: "Date", dataKey: "date" },
+        { title: "Ref", dataKey: "Ref" },
+        { title: "Supplier", dataKey: "provider_name" },
+        { title: "Reglement", dataKey: "Reglement" },
+        { title: "Amount", dataKey: "montant" },
+      ];
+      pdf.autoTable(columns, self.global_payments);
+      pdf.text("Global Payments List", 40, 25);
+      pdf.save("Global_Payments_List.pdf");
     }
   }, //end Methods
 
@@ -671,6 +856,7 @@ export default {
     this.Get_Purchases(1);
     this.Get_Payments(1);
     this.Get_Returns(1);
+    this.Get_GlobalPayments(1);
   }
 };
 </script>

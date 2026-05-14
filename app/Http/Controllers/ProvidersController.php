@@ -70,12 +70,18 @@ class ProvidersController extends BaseController
                 ->where('provider_id', $provider->id)
                 ->sum('GrandTotal');
 
-            $item['total_paid'] = DB::table('purchases')
-                ->where('deleted_at', '=', null)
-                ->where('statut', 'received')
-                ->where('provider_id', $provider->id)
-                ->sum('paid_amount');
+            $direct_payments = DB::table('payment_purchases')
+                ->join('purchases', 'payment_purchases.purchase_id', '=', 'purchases.id')
+                ->where('payment_purchases.deleted_at', '=', null)
+                ->where('purchases.provider_id', $provider->id)
+                ->sum('payment_purchases.montant');
 
+            $global_payments = DB::table('payment_purchases')
+                ->where('deleted_at', '=', null)
+                ->where('provider_id', $provider->id)
+                ->sum('montant');
+
+            $item['total_paid'] = $direct_payments + $global_payments;
             $item['due'] = $item['total_amount'] - $item['total_paid'];
 
             $item['total_amount_return'] = DB::table('purchase_returns')
@@ -287,89 +293,66 @@ class ProvidersController extends BaseController
     //------------- pay_supplier_due -------------\\
 
     public function pay_supplier_due(Request $request)
-     {
-         $this->authorizeForUser($request->user('api'), 'pay_supplier_due', Provider::class);
+    {
+        $this->authorizeForUser($request->user('api'), 'pay_supplier_due', Provider::class);
         
-         if($request['amount'] > 0){
+        if($request['amount'] > 0){
             $provider_purchases_due = Purchase::where('deleted_at', '=', null)
-            ->where([
-                ['payment_statut', '!=', 'paid'],
-                ['provider_id', $request->provider_id]
-            ])->get();
+                ->where([
+                    ['payment_statut', '!=', 'paid'],
+                    ['provider_id', $request->provider_id]
+                ])->get();
 
-            $provider = Provider::where('deleted_at', '=', null)->where('id', '=', $request->provider_id)->first();
+            // Create a single payment record for the full amount
+            $payment_purchase = new PaymentPurchase();
+            $payment_purchase->provider_id = $request->provider_id;
+            $payment_purchase->Ref = app('App\Http\Controllers\PaymentPurchasesController')->getNumberOrder();
+            $payment_purchase->date = Carbon::now();
+            $payment_purchase->Reglement = $request['Reglement'];
+            $payment_purchase->montant = $request['amount'];
+            $payment_purchase->change = 0;
+            $payment_purchase->notes = $request['notes'];
+            $payment_purchase->user_id = Auth::user()->id;
+            $payment_purchase->account_id = $request['account_id'] ?? null;
+            $payment_purchase->type_credit = $request->type ?? 'purchase';
+            $payment_purchase->save();
+
+            // Update account balance if account is provided
+            if ($request['account_id']) {
+                $account = Account::find($request['account_id']);
+                if ($account) {
+                    $account->update([
+                        'balance' => $account->balance - $request['amount'],
+                    ]);
+                }
+            }
 
             $paid_amount_total = $request->amount;
-            if ($request->type == 'credit_initial_only' || $request->type == 'credit_initial_first') {
-                $paid_aux = $request->amount;
-                if ($paid_amount_total > $provider->credit_initial) {
-                    $paid_amount_total = $paid_amount_total - $provider->credit_initial;
-                    $paid_aux = $provider->credit_initial;
-                    $provider->credit_initial = 0;
-                }
-                else {
-                    $provider->credit_initial = $provider->credit_initial - $paid_amount_total;
-                }
-                $provider->save();
-                $this->createPayment($request, $paid_aux, null, null, 'credit_initial');
-            }
 
-            if ($request->type == 'credit_achats_only' || $request->type == 'credit_initial_first' || $request->type == 'credit_achats_first') {
-                foreach($provider_purchases_due as $key => $provider_purchase){
-                    if($paid_amount_total == 0)
+            // Handle purchase payments - update paid amounts on individual purchases
+            // Note: credit_initial is NOT modified by payments - it's a static initial credit value
+            foreach($provider_purchases_due as $key => $provider_purchase){
+                if($paid_amount_total == 0)
                     break;
-                    $due = $provider_purchase->GrandTotal  - $provider_purchase->paid_amount;
+                $due = $provider_purchase->GrandTotal - $provider_purchase->paid_amount;
 
-                    if($paid_amount_total >= $due){
-                        $amount = $due;
-                        $payment_status = 'paid';
-                    }else{
-                        $amount = $paid_amount_total;
-                        $payment_status = 'partial';
-                    }
-                    $this->createPayment($request, $amount, $payment_status, $provider_purchase);
-                    $paid_amount_total -= $amount;
+                if($paid_amount_total >= $due){
+                    $amount = $due;
+                    $payment_status = 'paid';
+                } else {
+                    $amount = $paid_amount_total;
+                    $payment_status = 'partial';
                 }
+
+                // Update the purchase paid_amount (no separate payment record)
+                $provider_purchase->paid_amount += $amount;
+                $provider_purchase->payment_statut = $payment_status;
+                $provider_purchase->save();
+
+                $paid_amount_total -= $amount;
             }
-
-            if ($paid_amount_total > 0 && $request->type == 'credit_achats_first') {
-                $paid_aux = $paid_amount_total;
-                if ($paid_amount_total > $provider->credit_initial) {
-                    $paid_amount_total = $paid_amount_total - $provider->credit_initial;
-                    $paid_aux = $provider->credit_initial;
-                    $provider->credit_initial = 0;
-                }
-                else {
-                    $provider->credit_initial = $provider->credit_initial - $paid_amount_total;
-                }
-                $provider->save();
-                $this->createPayment($request, $paid_aux, null, null, 'credit_initial');
-            }
-            
         }
-         return response()->json(['success' => true]);
- 
-     }
-
-     protected function createPayment($request, $amount, $payment_status, $provider_purchase = null, $type = 'purchase') {
-        $payment_purchase = new PaymentPurchase();
-        if ($provider_purchase !== null) {
-            $payment_purchase->purchase_id = $provider_purchase->id;
-        }
-        $payment_purchase->Ref = app('App\Http\Controllers\PaymentPurchasesController')->getNumberOrder();
-        $payment_purchase->date = Carbon::now();
-        $payment_purchase->Reglement = $request['Reglement'];
-        $payment_purchase->montant = $amount;
-        $payment_purchase->change = 0;
-        $payment_purchase->notes = $request['notes'];
-        $payment_purchase->user_id = Auth::user()->id;
-        $payment_purchase->type_credit = $type;
-        $payment_purchase->save();
-        if ($provider_purchase !== null) {
-            $provider_purchase->paid_amount += $amount;
-            $provider_purchase->payment_statut = $payment_status;
-            $provider_purchase->save();
-        }
+        return response()->json(['success' => true]);
     }
 
      //------------- pay_purchase_return_due -------------\\

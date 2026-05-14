@@ -160,7 +160,7 @@ class ReportController extends BaseController
             $item['total_credit'] = $client->credit_initial + $item['due'] - $item['total_paid_return'];
 
 
-            $item['return_Due'] = $item['total_amount_return'] - $item['total_paid_return'];
+            $item['return_Due'] = $item['total_amount_return'];
 
             $item['name'] = $client->name;
             $item['phone'] = $client->phone;
@@ -256,13 +256,34 @@ class ReportController extends BaseController
             ->where('provider_id', $id)
             ->sum('GrandTotal');
 
-        $data['total_paid'] = DB::table('purchases')
+        $direct_payments = DB::table('payment_purchases')
+            ->join('purchases', 'payment_purchases.purchase_id', '=', 'purchases.id')
+            ->where('payment_purchases.deleted_at', '=', null)
+            ->where('purchases.provider_id', $id)
+            ->sum('payment_purchases.montant');
+
+        $global_payments = DB::table('payment_purchases')
             ->where('deleted_at', '=', null)
-            ->where('statut', 'received')
+            ->where('provider_id', $id)
+            ->sum('montant');
+
+        $data['total_paid'] = $direct_payments + $global_payments;
+
+        $data['total_paid_return'] = DB::table('purchase_returns')
+            ->where('deleted_at', '=', null)
             ->where('provider_id', $id)
             ->sum('paid_amount');
 
-        $data['due'] = ($data['total_amount'] - $data['total_paid']) + $provider->credit_initial;
+        $data['total_amount_return'] = DB::table('purchase_returns')
+            ->where('deleted_at', '=', null)
+            ->where('provider_id', $id)
+            ->sum('GrandTotal');
+
+        $data['return_due'] = $data['total_amount_return'] - $data['total_paid_return'];
+
+        $data['due'] = $data['total_amount'] - $data['total_paid'];
+
+        $data['total_credit'] = $provider->credit_initial + $data['due'] - $data['total_paid_return'];
 
         return response()->json(['report' => $data]);
 
@@ -627,6 +648,154 @@ class ReportController extends BaseController
             'directPaymentsTotalAmount' => $directPaymentsTotalAmount,
             'totalAmount' => $totalAmount,
             // Keep for backward compatibility
+            'payments' => $globalPayments->merge($directPayments)
+        ]);
+    }
+
+    //------------- provider_payments_report -------------\\
+
+    public function provider_payments_report(request $request)
+    {
+        $this->authorizeForUser($request->user('api'), 'Reports_suppliers', Provider::class);
+
+        $perPage = $request->limit;
+        $pageStart = \Request::get('page', 1);
+        $offSet = ($pageStart * $perPage) - $perPage;
+        $order = $request->SortField;
+        $dir = $request->SortType == 'false' ? 'asc' : 'desc';
+        $paymentType = $request->payment_type;
+
+        // Global payments: payment_purchases with provider_id (from pay_supplier_due)
+        $globalPaymentsQuery = DB::table('payment_purchases')
+            ->join('providers', 'payment_purchases.provider_id', '=', 'providers.id')
+            ->where('payment_purchases.deleted_at', '=', null)
+            ->where('providers.deleted_at', '=', null)
+            ->whereNotNull('payment_purchases.provider_id');
+
+        // Direct payments: payment_purchases linked to a purchase (from purchase payment flow)
+        $directPaymentsQuery = DB::table('payment_purchases')
+            ->join('purchases', 'payment_purchases.purchase_id', '=', 'purchases.id')
+            ->join('providers', 'purchases.provider_id', '=', 'providers.id')
+            ->where('payment_purchases.deleted_at', '=', null)
+            ->where('purchases.deleted_at', '=', null)
+            ->where('providers.deleted_at', '=', null)
+            ->whereNull('payment_purchases.provider_id');
+
+        // Apply filters
+        if ($request->filled('provider_id') && $request->provider_id != '') {
+            $globalPaymentsQuery->where('payment_purchases.provider_id', $request->provider_id);
+            $directPaymentsQuery->where('purchases.provider_id', $request->provider_id);
+        }
+
+        if ($request->filled('Ref') && $request->Ref != '') {
+            $globalPaymentsQuery->where('payment_purchases.Ref', 'LIKE', "%{$request->Ref}%");
+            $directPaymentsQuery->where('payment_purchases.Ref', 'LIKE', "%{$request->Ref}%");
+        }
+
+        if ($request->filled('Reglement') && $request->Reglement != '') {
+            $globalPaymentsQuery->where('payment_purchases.Reglement', 'LIKE', "%{$request->Reglement}%");
+            $directPaymentsQuery->where('payment_purchases.Reglement', 'LIKE', "%{$request->Reglement}%");
+        }
+
+        if ($request->filled('from') && $request->from != '') {
+            $globalPaymentsQuery->where('payment_purchases.date', '>=', $request->from);
+            $directPaymentsQuery->where('payment_purchases.date', '>=', $request->from);
+        }
+
+        if ($request->filled('to') && $request->to != '') {
+            $globalPaymentsQuery->where('payment_purchases.date', '<=', $request->to);
+            $directPaymentsQuery->where('payment_purchases.date', '<=', $request->to);
+        }
+
+        if ($request->filled('search') && $request->search != '') {
+            $globalPaymentsQuery->where(function ($query) use ($request) {
+                $query->where('payment_purchases.Ref', 'LIKE', "%{$request->search}%")
+                      ->orWhere('providers.name', 'LIKE', "%{$request->search}%")
+                      ->orWhere('payment_purchases.Reglement', 'LIKE', "%{$request->search}%");
+            });
+
+            $directPaymentsQuery->where(function ($query) use ($request) {
+                $query->where('payment_purchases.Ref', 'LIKE', "%{$request->search}%")
+                      ->orWhere('providers.name', 'LIKE', "%{$request->search}%")
+                      ->orWhere('payment_purchases.Reglement', 'LIKE', "%{$request->search}%")
+                      ->orWhere('purchases.Ref', 'LIKE', "%{$request->search}%");
+            });
+        }
+
+        $globalPaymentsTotal = clone $globalPaymentsQuery;
+        $directPaymentsTotal = clone $directPaymentsQuery;
+
+        $globalPaymentsCount = $globalPaymentsQuery->count();
+        $directPaymentsCount = $directPaymentsQuery->count();
+        $totalRows = $globalPaymentsCount + $directPaymentsCount;
+
+        $globalPaymentsTotalAmount = $globalPaymentsTotal->sum('payment_purchases.montant');
+        $directPaymentsTotalAmount = $directPaymentsTotal->sum('payment_purchases.montant');
+        $totalAmount = $globalPaymentsTotalAmount + $directPaymentsTotalAmount;
+
+        if ($perPage == "-1") {
+            $perPage = $totalRows;
+        }
+
+        $globalPayments = collect();
+        $directPayments = collect();
+
+        if (!$paymentType || $paymentType === 'global') {
+            $globalPayments = $globalPaymentsQuery
+                ->select(
+                    'payment_purchases.id',
+                    'payment_purchases.date',
+                    'payment_purchases.Ref',
+                    'payment_purchases.Reglement',
+                    'payment_purchases.montant',
+                    'payment_purchases.notes',
+                    'providers.name as provider_name',
+                    'providers.id as provider_id',
+                    DB::raw("'global' as payment_type")
+                )
+                ->orderBy($order ?: 'payment_purchases.id', $dir)
+                ->skip($paymentType === 'global' ? $offSet : 0)
+                ->take($paymentType === 'global' ? $perPage : $globalPaymentsCount)
+                ->get();
+        }
+
+        if (!$paymentType || $paymentType === 'direct') {
+            $directPayments = $directPaymentsQuery
+                ->select(
+                    'payment_purchases.id',
+                    'payment_purchases.date',
+                    'payment_purchases.Ref',
+                    'payment_purchases.Reglement',
+                    'payment_purchases.montant',
+                    'payment_purchases.notes',
+                    'providers.name as provider_name',
+                    'providers.id as provider_id',
+                    'purchases.Ref as purchase_ref',
+                    'payment_purchases.purchase_id',
+                    DB::raw("'direct' as payment_type")
+                )
+                ->orderBy($order ?: 'payment_purchases.id', $dir)
+                ->skip($paymentType === 'direct' ? $offSet : 0)
+                ->take($paymentType === 'direct' ? $perPage : $directPaymentsCount)
+                ->get();
+        }
+
+        $providers = DB::table('providers')
+            ->where('deleted_at', '=', null)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'globalPayments' => $globalPayments,
+            'directPayments' => $directPayments,
+            'providers' => $providers,
+            'totalRows' => $totalRows,
+            'globalPaymentsCount' => $globalPaymentsCount,
+            'directPaymentsCount' => $directPaymentsCount,
+            'globalPaymentsTotalAmount' => $globalPaymentsTotalAmount,
+            'directPaymentsTotalAmount' => $directPaymentsTotalAmount,
+            'totalAmount' => $totalAmount,
             'payments' => $globalPayments->merge($directPayments)
         ]);
     }
@@ -1222,30 +1391,34 @@ class ReportController extends BaseController
                 ->where('provider_id', $provider->id)
                 ->sum('GrandTotal');
 
-            $item['total_paid'] = DB::table('purchases')
-                ->where('deleted_at', '=', null)
-                ->where('statut', 'received')
-                ->where('provider_id', $provider->id)
-                ->sum('paid_amount');
+            $direct_payments = DB::table('payment_purchases')
+                ->join('purchases', 'payment_purchases.purchase_id', '=', 'purchases.id')
+                ->where('payment_purchases.deleted_at', '=', null)
+                ->where('purchases.provider_id', $provider->id)
+                ->sum('payment_purchases.montant');
 
+            $global_payments = DB::table('payment_purchases')
+                ->where('deleted_at', '=', null)
+                ->where('provider_id', $provider->id)
+                ->sum('montant');
+
+            $item['total_paid'] = $direct_payments + $global_payments;
             $item['due'] = $item['total_amount'] - $item['total_paid'];
 
-
-
             $item['total_amount_return'] = DB::table('purchase_returns')
-            ->where('deleted_at', '=', null)
-            ->where('provider_id', $provider->id)
-            ->sum('GrandTotal');
+                ->where('deleted_at', '=', null)
+                ->where('provider_id', $provider->id)
+                ->sum('GrandTotal');
 
             $item['total_paid_return'] = DB::table('purchase_returns')
                 ->where('deleted_at', '=', null)
                 ->where('provider_id', $provider->id)
                 ->sum('paid_amount');
 
-            $item['return_Due'] = $item['total_amount_return'] - $item['total_paid_return'];
+            $item['return_Due'] = $item['total_amount_return'];
 
             $item['credit_initial'] = $provider->credit_initial ?? 0;
-            $item['total_credit'] = $provider->credit_initial + $item['due'];
+            $item['total_credit'] = $provider->credit_initial + $item['due'] - $item['total_paid_return'];
 
             $item['id'] = $provider->id;
             $item['name'] = $provider->name;
@@ -1386,6 +1559,60 @@ class ReportController extends BaseController
 
         return response()->json([
             'payments' => $payments,
+            'totalRows' => $totalRows,
+        ]);
+    }
+
+    //-------------------- Get Global Payments By Provider -------------\\
+
+    public function Global_Payments_Provider(request $request)
+    {
+        $this->authorizeForUser($request->user('api'), 'Reports_suppliers', Provider::class);
+
+        $perPage = $request->limit;
+        $pageStart = \Request::get('page', 1);
+        $offSet = ($pageStart * $perPage) - $perPage;
+
+        $Role = Auth::user()->roles()->first();
+        $ShowRecord = Role::findOrFail($Role->id)->inRole('record_view');
+
+        $payments = DB::table('payment_purchases')
+            ->where(function ($query) use ($ShowRecord) {
+                if (!$ShowRecord) {
+                    return $query->where('payment_purchases.user_id', '=', Auth::user()->id);
+                }
+            })
+            ->where('payment_purchases.deleted_at', '=', null)
+            ->where('payment_purchases.provider_id', $request->id)
+            ->where(function ($query) use ($request) {
+                return $query->when($request->filled('search'), function ($query) use ($request) {
+                    return $query->where('payment_purchases.Ref', 'LIKE', "%{$request->search}%")
+                        ->orWhere('payment_purchases.date', 'LIKE', "%{$request->search}%")
+                        ->orWhere('payment_purchases.Reglement', 'LIKE', "%{$request->search}%");
+                });
+            })
+            ->join('providers', 'payment_purchases.provider_id', '=', 'providers.id')
+            ->select(
+                'payment_purchases.id',
+                'payment_purchases.date',
+                'payment_purchases.Ref AS Ref',
+                'payment_purchases.Reglement',
+                'payment_purchases.montant',
+                'payment_purchases.notes',
+                'providers.name as provider_name'
+            );
+
+        $totalRows = $payments->count();
+        if($perPage == "-1"){
+            $perPage = $totalRows;
+        }
+        $payments = $payments->offset($offSet)
+            ->limit($perPage)
+            ->orderBy('payment_purchases.id', 'desc')
+            ->get();
+
+        return response()->json([
+            'global_payments' => $payments,
             'totalRows' => $totalRows,
         ]);
     }
@@ -4479,12 +4706,18 @@ class ReportController extends BaseController
             ->where('provider_id', $id)
             ->sum('GrandTotal');
 
-        $data['total_paid'] = DB::table('purchases')
-            ->where('deleted_at', '=', null)
-            ->where('statut', 'received')
-            ->where('provider_id', $id)
-            ->sum('paid_amount');
+        $direct_payments = DB::table('payment_purchases')
+            ->join('purchases', 'payment_purchases.purchase_id', '=', 'purchases.id')
+            ->where('payment_purchases.deleted_at', '=', null)
+            ->where('purchases.provider_id', $id)
+            ->sum('payment_purchases.montant');
 
+        $global_payments = DB::table('payment_purchases')
+            ->where('deleted_at', '=', null)
+            ->where('provider_id', $id)
+            ->sum('montant');
+
+        $data['total_paid'] = $direct_payments + $global_payments;
         $data['due'] = $data['total_amount'] - $data['total_paid'];
 
         $data['total_amount_return'] = DB::table('purchase_returns')
@@ -4497,8 +4730,9 @@ class ReportController extends BaseController
             ->where('provider_id', $id)
             ->sum('paid_amount');
 
-        $data['return_Due'] = $data['total_amount_return'] - $data['total_paid_return'];
-      
+        $data['return_Due'] = $data['total_amount_return'];
+        $data['total_credit'] = $provider->credit_initial + $data['due'] - $data['total_paid_return'];
+
          $symbol = $helpers->Get_Currency();
          $settings = Setting::where('deleted_at', '=', null)->first();
  

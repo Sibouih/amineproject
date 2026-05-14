@@ -736,6 +736,14 @@
                   <span class="item-name">{{$t('PurchasesReturn')}}</span>
                 </router-link>
               </li>
+              <li
+                v-if="currentUserPermissions && currentUserPermissions.includes('Reports_suppliers')"
+              >
+                <router-link tag="a" class to="/app/reports/provider_payments">
+                  <i class="nav-icon i-ID-Card"></i>
+                  <span class="item-name">{{$t('ProviderPayments')}}</span>
+                </router-link>
+              </li>
             </ul>
           </li>
           <li

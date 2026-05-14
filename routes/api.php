@@ -52,6 +52,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get("report/provider/{id}", "ReportController@Provider_Report_detail");
     Route::get("report/provider_purchases", "ReportController@Purchases_Provider");
     Route::get("report/provider_payments", "ReportController@Payments_Provider");
+    Route::get("report/provider_global_payments", "ReportController@Global_Payments_Provider");
     Route::get("report/provider_returns", "ReportController@Returns_Provider");
     Route::get("report/sales", "ReportController@Report_Sales");
     Route::get("report/purchases", "ReportController@Report_Purchases");
@@ -115,6 +116,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::get("report/global_client_payments", "ReportController@Payments_Client");
     Route::get("report/old_payment_detail/{id}", "ReportController@Old_Payment_Detail");
     Route::get("report/client_payments_report", "ReportController@client_payments_report");
+    Route::get("report/provider_payments_report", "ReportController@provider_payments_report");
 
     //------------------------------Employee------------------------------------\\
 
