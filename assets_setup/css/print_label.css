@@ -1,0 +1,280 @@
+@media print{
+	.barcode_non_a4 , .barcodea4{
+		margin: 0;
+	}
+
+	.barcode_non_a4 , .barcode_non_a4 .barcode-item, .barcodea4 , .barcodea4 .barcode-item{
+		border: none!important;
+	}
+    
+    .barcode_non_a4 .style50_25 svg {
+        display: block !important;
+        visibility: visible !important;
+        margin: 0 auto !important;
+        height: auto !important;
+        width: 100% !important;
+        max-width: 40mm !important;
+        background: transparent !important;
+    }
+    
+    .barcode-container {
+        display: flex !important;
+        justify-content: center !important;
+        visibility: visible !important;
+        height: 15mm !important;
+        background: transparent !important;
+    }
+    
+    .barcode {
+        display: inline-block !important;
+        visibility: visible !important;
+        background: transparent !important;
+    }
+    
+    .barcode_non_a4 .style50_25 .barcode-name {
+        text-transform: uppercase !important;
+        font-weight: bold !important;
+        font-size: 14px !important;
+    }
+    
+    .barcode_non_a4 .style50_25 .barcode-price {
+        font-weight: bold !important;
+        font-size: 11px !important;
+    }
+    
+    .barcode > svg rect {
+        fill: #000000 !important;
+    }
+    
+    .barcode > svg g {
+        fill: transparent !important;
+        stroke: #000000 !important;
+    }
+}
+
+.barcodea4{
+    width: 8.25in;
+    height: 11.6in;
+    display: block;
+    border: 1px solid #CCC;
+    margin: 10px auto;
+    padding: 0.1in 0 0 0.1in;
+    page-break-after: always;
+}
+
+.barcode_non_a4{
+    width: 8.45in;
+    height: 10.3in;
+    display: block;
+    border: 1px solid #CCC;
+    margin: 10px auto;
+    padding-top: 0.1in;
+    page-break-after: always;
+}
+
+.barcode_non_a4 .barcode-item {
+	display: block;
+	overflow: hidden;
+	text-align: center;
+	border: 1px dotted #CCC;
+	font-size: 12px;
+	line-height: 14px;
+	text-transform: uppercase;
+	float: left;
+} 
+
+.barcode_non_a4 .head_barcode{
+	padding-left: 10px;
+	font-weight: bold;
+	text-align: left;
+}
+
+.barcodea4 .head_barcode{
+	padding-left: 10px;
+	font-weight: bold;
+	text-align: left;
+}
+
+.barcode-name{
+	display: block;
+}
+
+.barcode-price{
+	display: block;
+}
+
+.barcodea4 .style24 .head_barcode{
+	font-size: 14px;
+}
+
+.barcodea4 .style18 .head_barcode{
+	font-size: 14px;
+}
+
+.barcodea4 .style12 .head_barcode{
+	font-size: 15px;
+}
+
+.barcode_non_a4 .head_barcode{
+	font-size: 14px;
+}
+.barcode_non_a4 .style10 .head_barcode{
+	font-size: 16px;
+}
+
+.barcodea4 .barcode-item {
+	display: block;
+	overflow: hidden;
+	text-align: center;
+	border: 1px dotted #CCC;
+	font-size: 12px;
+	line-height: 14px;
+	text-transform: uppercase;
+	float: left;
+} 
+
+.barcodea4 .style40 {
+    width: 1.799in;
+    height: 1.003in;
+	margin: 0 0.07in;
+	padding-top: 0.05in;
+} 
+
+.barcode_non_a4 .style30 {
+    width: 2.625in;
+    height: 1in;
+	margin: 0 0.07in;
+	padding-top: 0.05in;
+} 
+
+.barcode_non_a4 .style30:nth-child(3n+1) {
+    margin-left: 0.1in;
+} 
+
+.barcodea4 .style24 {
+    width: 2.48in;
+    height: 1.335in;
+	margin-left: 0.079in;
+	padding-top: 0.05in;
+} 
+
+.barcode_non_a4 .style20 {
+    width: 4in;
+    height: 1in;
+	margin: 0 0.1in;
+	padding-top: 0.05in;
+} 
+
+.barcodea4 .style18 {
+    width: 2.5in;
+    height: 1.835in;
+	margin-left: 0.079in;
+	padding-top: 0.05in;
+	font-size: 13px;
+	line-height: 20px;
+} 
+
+.barcode_non_a4 .style14 {
+    width: 4in;
+    height: 1.33in;
+	margin: 0 0.1in;
+	padding-top: 0.1in;
+} 
+
+.barcodea4 .style12 {
+    width: 2.5in;
+    height: 2.834in;
+	margin-left: 0.079in;
+	padding-top: 0.05in;
+	font-size: 14px;
+	line-height: 20px;
+} 
+
+.barcode_non_a4 .style10 {
+    width: 4in;
+    height: 2in;
+	margin: 0 0.1in;
+	padding-top: 0.1in;
+	font-size: 14px;
+	line-height: 20px;
+} 
+
+.barcode_non_a4 .style50_25 {
+    width: 50mm;
+    height: 25mm;
+    margin: 2mm;
+    padding: 0;
+    font-size: 10px;
+    line-height: 12px;
+    display: inline-block;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.barcode_non_a4 .style50_25 .barcode {
+    transform: scale(1);
+    margin: 0 auto;
+    max-width: 46mm;
+    display: block !important;
+    background: transparent !important;
+}
+
+.barcode_non_a4 .style50_25 .barcode svg {
+    height: auto !important;
+    width: 100% !important;
+    max-width: 40mm;
+    background: transparent !important;
+}
+
+.barcode-container {
+    width: 100%;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 15mm;
+    margin-top: 0;
+    padding: 0;
+    background: transparent !important;
+}
+
+.barcode_non_a4 .style50_25 .head_barcode {
+    font-size: 12px;
+    padding: 0;
+    line-height: 14px;
+    text-align: center;
+    font-weight: bold;
+    height: 7mm;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0;
+}
+
+.barcode_non_a4 .style50_25 .barcode-name {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 46mm;
+    display: block;
+    margin: 0 auto;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.barcode_non_a4 .style50_25 .barcode-price {
+    font-size: 11px;
+    text-align: center;
+    display: block;
+    font-weight: bold;
+    margin-top: 1mm;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+	
