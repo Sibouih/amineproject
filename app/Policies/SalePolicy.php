@@ -79,8 +79,19 @@ class SalePolicy
         return $user->hasRole($permission->roles);
     }
 
+    // profit of a sale (sale detail > Profit): administrators only by default
+    public function Sales_profit(User $user)
+    {
+        $permission = Permission::where('name', 'Sales_profit')->first();
+        return $permission ? $user->hasRole($permission->roles) : false;
+    }
+
     public function Sales_pos(User $user)
     {
+        // "POS only" users (user form) may always use the POS, whatever their role
+        if ($user->pos_only) {
+            return true;
+        }
         $permission = Permission::where('name', 'Pos_view')->first();
         return $user->hasRole($permission->roles);
     }

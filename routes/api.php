@@ -29,9 +29,13 @@ Route::group([
 
 
 Route::post('getAccessToken', 'AuthController@getAccessToken');
-Route::middleware(['auth:api', 'Is_Active'])->group(function () {
+
+// build of the front end on the server: open tabs check it to offer a reload after a deploy (no login needed)
+Route::get('app_version', 'AppVersionController@show');
+Route::middleware(['auth:api', 'Is_Active', 'Pos_Only'])->group(function () {
     
     Route::get("dashboard_data", "DashboardController@dashboard_data");
+    Route::get("day_summary", "DaySummaryController@show");
     
     Route::get('/retrieve-customer', 'StripeController@retrieveCustomer');
     Route::post('/update-customer-stripe', 'StripeController@updateCustomer');
@@ -246,6 +250,12 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     Route::post('pos/create_pos', 'PosController@CreatePOS');
     Route::get('pos/get_products_pos', 'PosController@GetProductsByParametre');
     Route::get('pos/data_create_pos', 'PosController@GetELementPos');
+    Route::get('pos/product_lookup', 'PosController@product_lookup');
+    Route::get('pos/product_info/{id}', 'PosController@product_info');
+    Route::get('pos/sale_print/{id}', 'PosController@sale_print');
+    Route::get('pos/cart', 'PosController@get_cart');
+    Route::put('pos/cart', 'PosController@save_cart');
+    Route::get('pos/day_products', 'PosController@day_products');
 
     //----------------------Draft -------------------------------------\\
     //------------------------------------------------------------------\\
@@ -326,6 +336,7 @@ Route::middleware(['auth:api', 'Is_Active'])->group(function () {
     //-------------------------------  Sales --------------------------\\
     //------------------------------------------------------------------\\
 
+    Route::get('sales/profit/{id}', 'SalesController@Sale_Profit');
     Route::resource('sales', 'SalesController');
     Route::get('convert_to_sale_data/{id}', 'SalesController@Elemens_Change_To_Sale');
     Route::get('get_payments_by_sale/{id}', 'SalesController@Payments_Sale');

@@ -128,7 +128,10 @@ class SettingsController extends Controller
          $PosSetting = PosSetting::where('deleted_at', '=', null)->first();
 
          return response()->json([
-             'pos_settings' => $PosSetting
+             'pos_settings' => $PosSetting,
+             // charges in the POS: categories to choose from, and the ones offered (null = all)
+             'expense_categories' => \DB::table('expense_categories')->whereNull('deleted_at')->orderBy('name')->get(['id', 'name']),
+             'charge_categories' => $PosSetting ? $PosSetting->chargeCategoryIds() : null,
             ], 200);
     
     }
@@ -168,6 +171,17 @@ class SettingsController extends Controller
             'is_printable'   => $is_printable,
             'show_Warehouse' => $show_Warehouse,
         ]);
+
+        // categories offered for the charges in the POS (null = all)
+        if ($request->has('charge_categories_all')) {
+            $ids = [];
+            if (!in_array((string) $request['charge_categories_all'], ['1', 'true'], true)) {
+                $ids = \DB::table('expense_categories')->whereNull('deleted_at')
+                    ->whereIn('id', array_filter((array) $request['charge_categories']))
+                    ->pluck('id')->map(function ($id) { return (int) $id; })->toArray();
+            }
+            PosSetting::whereId($id)->update(['charge_categories' => count($ids) ? json_encode(array_values($ids)) : null]);
+        }
 
         return response()->json(['success' => true]);
 

@@ -52,7 +52,16 @@
               >
               <i class="i-File-Excel"></i> EXCEL
           </vue-excel-xlsx>
-        
+          <router-link
+            class="btn-sm btn btn-primary ripple btn-icon m-1"
+            v-if="currentUserPermissions && currentUserPermissions.includes('Purchase_Returns_add')"
+            to="/app/purchase_return/store"
+          >
+            <span class="ul-btn__icon">
+              <i class="i-Add"></i>
+            </span>
+            <span class="ul-btn__text ml-1">{{$t('Add')}}</span>
+          </router-link>
         </div>
 
         <template slot="table-row" slot-scope="props">
@@ -106,6 +115,21 @@
                 <b-dropdown-item title="PDF" @click="Return_PDF(props.row , props.row.id)">
                   <i class="nav-icon i-File-TXT font-weight-bold mr-2"></i>
                   {{$t('DownloadPdf')}}
+                </b-dropdown-item>
+
+                <b-dropdown-item title="Print" :to="{ path: '/app/purchase_return/detail/'+props.row.id, query: { print: 1 } }">
+                  <i class="nav-icon i-Billing font-weight-bold mr-2"></i>
+                  {{$t('print')}}
+                </b-dropdown-item>
+
+                <b-dropdown-item title="Email" @click="Return_Email(props.row)">
+                  <i class="nav-icon i-Envelope-2 font-weight-bold mr-2"></i>
+                  {{$t('EmailReturn')}}
+                </b-dropdown-item>
+
+                <b-dropdown-item title="SMS" @click="Return_SMS(props.row)">
+                  <i class="nav-icon i-Speach-Bubble font-weight-bold mr-2"></i>
+                  SMS
                 </b-dropdown-item>
 
                 <b-dropdown-item
@@ -775,6 +799,40 @@ export default {
       this.Filter_date = "";
       this.Filter_warehouse = "",
       this.Get_purchase_returns(this.serverParams.page);
+    },
+
+    //------------------------------ Send return by Email / SMS -------------------------\\
+    Send_Return_Message(type, purchase_return) {
+      NProgress.start();
+      NProgress.set(0.1);
+      axios
+        .post("returns/purchase/send/" + type, {
+          id: purchase_return.id
+        })
+        .then(() => {
+          NProgress.done();
+          this.makeToast(
+            "success",
+            type === "email" ? this.$t("Send.TitleEmail") : this.$t("Send_SMS"),
+            this.$t("Success")
+          );
+        })
+        .catch(error => {
+          NProgress.done();
+          const code = error && error.response && error.response.data && error.response.data.message;
+          let msg = type === "email" ? this.$t("SMTPIncorrect") : this.$t("Failed");
+          if (code === "supplier_email_missing") msg = this.$t("Supplier_No_Email") + " (" + purchase_return.provider_name + ")";
+          else if (code === "supplier_phone_missing") msg = this.$t("Supplier_No_Phone") + " (" + purchase_return.provider_name + ")";
+          this.makeToast("danger", msg, this.$t("Failed"));
+        });
+    },
+
+    Return_Email(purchase_return) {
+      this.Send_Return_Message("email", purchase_return);
+    },
+
+    Return_SMS(purchase_return) {
+      this.Send_Return_Message("sms", purchase_return);
     },
 
     //------------------------------Formetted Numbers -------------------------\\

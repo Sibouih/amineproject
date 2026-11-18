@@ -813,6 +813,18 @@
                                 <span class="checkmark"></span>
                               </label>
                             </b-col>
+                            <!--Sales profit (administrators) -->
+                            <b-col md="12">
+                              <label class="checkbox checkbox-outline-primary">
+                                <input
+                                  type="checkbox"
+                                  v-model="permissions"
+                                  value="Sales_profit"
+                                >
+                                <span>{{$t('PosNext.perm_sales_profit')}}</span>
+                                <span class="checkmark"></span>
+                              </label>
+                            </b-col>
 
                              <!--shipment -->
                             <b-col md="12">

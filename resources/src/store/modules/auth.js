@@ -98,6 +98,12 @@ const actions = {
             context.commit('Notifs_alert', notifs)
 
             context.commit('SetDefaultLanguage', default_language)
+
+            // "POS only" user: leave any other page for the POS
+            const path = router.currentRoute.path;
+            if (user && user.pos_only && path !== '/app/pos' && path.indexOf('/app/pos/') !== 0) {
+                router.replace('/app/pos').catch(() => {});
+            }
         }).catch(() => {
             context.commit('setPermissions', null)
             context.commit('setallmodules', null)

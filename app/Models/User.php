@@ -17,7 +17,9 @@ class User extends Authenticatable
      * @var array
      */
     protected $fillable = [
-        'firstname', 'lastname', 'username', 'email', 'password', 'phone', 'statut', 'avatar', 'role_id','is_all_warehouses'
+        'firstname', 'lastname', 'username', 'email', 'password', 'phone', 'statut', 'avatar', 'role_id','is_all_warehouses',
+        'pos_all_clients', 'pos_default_client_id', 'pos_default_warehouse_id', 'pos_only',
+        'pos_edit_price', 'pos_edit_confirmed',
     ];
 
     /**
@@ -39,6 +41,12 @@ class User extends Authenticatable
         'role_id' => 'integer',
         'statut' => 'integer',
         'is_all_warehouses' => 'integer',
+        'pos_all_clients' => 'integer',
+        'pos_default_client_id' => 'integer',
+        'pos_default_warehouse_id' => 'integer',
+        'pos_only' => 'integer',
+        'pos_edit_price' => 'integer',
+        'pos_edit_confirmed' => 'integer',
     ];
 
     public function oauthAccessToken()
@@ -67,6 +75,12 @@ class User extends Authenticatable
     public function assignedWarehouses()
     {
         return $this->belongsToMany('App\Models\Warehouse');
+    }
+
+    // Customers this user may sell to in the POS (used only when pos_all_clients = 0)
+    public function posClients()
+    {
+        return $this->belongsToMany('App\Models\Client', 'user_pos_clients', 'user_id', 'client_id');
     }
 
 }

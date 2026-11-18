@@ -118,7 +118,7 @@
                             <span class="badge badge-success">{{detail.name}}</span>
                            
                           </td>
-                          <td>{{currentUser.currency}} {{formatNumber(detail.Net_price, 3)}}</td>
+                          <td>{{currentUser.currency}} {{formatNumber(detail.Net_cost, 3)}}</td>
                           <td>
                             <span class="badge badge-warning" v-if="detail.product_type == 'is_service'">----</span>
                             <span class="badge badge-warning" v-else>{{detail.stock}} {{detail.unitPurchase}}</span>
@@ -763,7 +763,7 @@ export default {
 
           if (this.details[i].tax_method == "1") {
             //Exclusive
-            this.details[i].Net_price = parseFloat(
+            this.details[i].Net_cost = parseFloat(
               this.details[i].Unit_cost - this.details[i].DiscountNet
             );
 
@@ -774,14 +774,14 @@ export default {
             );
           } else {
             //Inclusive
-            this.details[i].Net_price = parseFloat(
+            this.details[i].Net_cost = parseFloat(
               (this.details[i].Unit_cost - this.details[i].DiscountNet) /
                 (this.details[i].tax_percent / 100 + 1)
             );
 
             this.details[i].taxe = parseFloat(
               this.details[i].Unit_cost -
-                this.details[i].Net_price -
+                this.details[i].Net_cost -
                 this.details[i].DiscountNet
             );
           }
@@ -977,7 +977,7 @@ export default {
       for (var i = 0; i < this.details.length; i++) {
         var tax = this.details[i].taxe * this.details[i].quantity;
         this.details[i].subtotal = parseFloat(
-          this.details[i].quantity * this.details[i].Net_price + tax
+          this.details[i].quantity * this.details[i].Net_cost + tax
         );
         this.total = parseFloat(this.total + this.details[i].subtotal);
       }
@@ -1135,9 +1135,9 @@ export default {
         this.product.product_id = response.data.id;
         this.product.product_type = response.data.product_type;
         this.product.name = response.data.name;
-        this.product.Net_price = response.data.Net_price;
+        this.product.Net_cost = response.data.Net_cost;
         this.product.Unit_cost = response.data.Unit_cost;
-        this.product.taxe = response.data.tax_price;
+        this.product.taxe = response.data.tax_cost;
         this.product.tax_method = response.data.tax_method;
         this.product.tax_percent = response.data.tax_percent;
         this.product.unitPurchase = response.data.unitPurchase;

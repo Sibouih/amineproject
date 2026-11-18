@@ -117,6 +117,30 @@
                         </label>
                     </b-col>
 
+                  <!-- POS charges: which expense categories the cashier can choose -->
+                  <b-col md="12" class="mt-2">
+                    <hr class="mt-0">
+                    <h5 class="mb-1">{{ $t('PosNext.settings_charges_title') }}</h5>
+                    <p class="text-muted small">{{ $t('PosNext.settings_charges_help') }}</p>
+                    <b-form-group>
+                      <b-form-radio-group
+                        v-model="charge_all"
+                        :options="[{ text: $t('PosNext.settings_charges_all'), value: true }, { text: $t('PosNext.settings_charges_some'), value: false }]"
+                      />
+                    </b-form-group>
+                    <b-form-group v-if="!charge_all">
+                      <v-select
+                        multiple
+                        v-model="charge_categories"
+                        :reduce="c => c.id"
+                        label="name"
+                        :options="expense_categories"
+                        :placeholder="$t('PleaseSelect')"
+                      />
+                      <small v-if="!charge_categories.length" class="text-muted">{{ $t('PosNext.settings_charges_none_selected') }}</small>
+                    </b-form-group>
+                  </b-col>
+
                   <b-col md="12">
                     <b-form-group>
                       <b-button variant="primary" type="submit"><i class="i-Yes me-2 font-weight-bold"></i> {{$t('submit')}}</b-button>
@@ -158,6 +182,11 @@ export default {
         show_Warehouse:"",
         is_printable:'',
       },
+
+      // expense categories offered for the POS charges
+      expense_categories: [],
+      charge_all: true,
+      charge_categories: [],
 
     };
   },
@@ -210,6 +239,9 @@ export default {
           show_customer: this.pos_settings.show_customer,  
           show_Warehouse: this.pos_settings.show_Warehouse,  
           is_printable: this.pos_settings.is_printable,      
+          // no category chosen = all of them
+          charge_categories_all: this.charge_all || !this.charge_categories.length,
+          charge_categories: this.charge_categories,
         })
         .then(response => {
           Fire.$emit("Event_Pos_Settings");
@@ -233,6 +265,10 @@ export default {
         .get("get_pos_Settings")
         .then(response => {
           this.pos_settings = response.data.pos_settings;
+          this.expense_categories = response.data.expense_categories || [];
+          const ids = response.data.charge_categories;
+          this.charge_all = !ids || !ids.length;
+          this.charge_categories = ids || [];
           this.isLoading = false;
         })
         .catch(error => {

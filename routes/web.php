@@ -119,6 +119,9 @@ Route::group(['middleware' => ['web', 'auth:web', 'Is_Active']], function () {
 
             if ($installed === false) {
                 return redirect('/setup');
+            } elseif (Auth::user() && Auth::user()->pos_only && !request()->is('app/pos', 'app/pos/*')) {
+                // "POS only" users: every page opens the POS
+                return redirect('/app/pos');
             } else {
                 return view('layouts.master' , [
                     'ModulesInstalled' => $ModulesData['ModulesInstalled'],

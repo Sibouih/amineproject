@@ -165,7 +165,7 @@ class ClientController extends BaseController
             ]
         );
 
-        Client::create([
+        $client = Client::create([
             'name' => $request['name'],
             'code' => $this->getNumberOrder(),
             'adresse' => $request['adresse'],
@@ -177,7 +177,8 @@ class ClientController extends BaseController
             'credit_initial' => $request['credit_initial'] ?? 0,
             'tax_number' => $request['tax_number'],
         ]);
-        return response()->json(['success' => true]);
+        // id returned so the POS can select the customer it just created
+        return response()->json(['success' => true, 'id' => $client->id]);
     }
 
     //------------ function show -----------\\

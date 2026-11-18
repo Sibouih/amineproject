@@ -423,7 +423,13 @@ class PurchasesController extends BaseController
                     }
                 }
 
-                $due = $request['GrandTotal'] - $current_Purchase->paid_amount;
+                // If the new GrandTotal is less than what was already paid, cap paid_amount
+                $paid_amount = $current_Purchase->paid_amount;
+                if ($paid_amount > $request['GrandTotal']) {
+                    $paid_amount = $request['GrandTotal'];
+                }
+
+                $due = $request['GrandTotal'] - $paid_amount;
                 if ($due === 0.0 || $due < 0.0) {
                     $payment_statut = 'paid';
                 } else if ($due != $request['GrandTotal']) {
@@ -443,6 +449,7 @@ class PurchasesController extends BaseController
                     'shipping' => $request['shipping'],
                     'statut' => $request['statut'],
                     'GrandTotal' => $request['GrandTotal'],
+                    'paid_amount' => $paid_amount,
                     'payment_statut' => $payment_statut,
                 ]);
             }

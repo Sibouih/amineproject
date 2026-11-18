@@ -3,6 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Mail\ReturnMail;
+use App\Mail\CustomEmail;
+use App\Models\EmailMessage;
+use App\Models\SMSMessage;
+use Illuminate\Support\Str;
+use Twilio\Rest\Client as Client_Twilio;
+use GuzzleHttp\Client as Client_guzzle;
+use Infobip\Api\SendSmsApi;
+use Infobip\Configuration;
+use Infobip\Model\SmsAdvancedTextualRequest;
+use Infobip\Model\SmsDestination;
+use Infobip\Model\SmsTextualMessage;
 use App\Models\Client;
 use App\Models\Unit;
 use App\Models\PaymentSaleReturns;
@@ -265,24 +276,43 @@ class SalesReturnController extends BaseController
 
         $this->authorizeForUser($request->user('api'), 'update', SaleReturn::class);
 
+        request()->validate([
+            'date' => 'required',
+            'statut' => 'required',
+            'details' => 'required|array|min:1',
+        ]);
+
         \DB::transaction(function () use ($request, $id) {
             $role = Auth::user()->roles()->first();
             $view_records = Role::findOrFail($role->id)->inRole('record_view');
-            $current_SaleReturn = SaleReturn::findOrFail($id);
+            $current_SaleReturn = SaleReturn::where('deleted_at', '=', null)->findOrFail($id);
 
             // Check If User Has Permission view All Records
             if (!$view_records) {
                 // Check If User->id === SaleReturn->id
                 $this->authorizeForUser($request->user('api'), 'check_record', $current_SaleReturn);
             }
+
+            // A return linked to a sale keeps the sale's client and warehouse.
+            // A standalone return (no sale) can change both.
+            if ($current_SaleReturn->sale_id) {
+                $client_id = $current_SaleReturn->client_id;
+                $warehouse_id = $current_SaleReturn->warehouse_id;
+            } else {
+                $client_id = $request['client_id'] ?: $current_SaleReturn->client_id;
+                $warehouse_id = $request['warehouse_id'] ?: $current_SaleReturn->warehouse_id;
+            }
+            // Stock of the new lines goes to the (possibly new) warehouse
+            $request->merge(['warehouse_id' => $warehouse_id]);
+
             $old_return_details = SaleReturnDetails::where('sale_return_id', $id)->get();
             $new_return_details = $request['details'];
             $length = sizeof($new_return_details);
 
-            // Get Ids details
+            // Get Ids details (lines added in the edit form have no id yet)
             $new_products_id = [];
             foreach ($new_return_details as $new_detail) {
-                $new_products_id[] = $new_detail['id'];
+                $new_products_id[] = $new_detail['id'] ?? 0;
             }
 
             // Init Data with old Parametre
@@ -300,7 +330,7 @@ class SalesReturnController extends BaseController
 
                     if($product_unit_sale_id['unitSale']){
                         $unit = Unit::where('id', $product_unit_sale_id['unitSale']->id)->first();
-                    }{
+                    }else{
                         $unit = NULL;
                     }
                 }
@@ -350,8 +380,12 @@ class SalesReturnController extends BaseController
             foreach ($new_return_details as $key => $product_detail) {
                
                 $get_type_product = Product::where('id', $product_detail['product_id'])->first()->type;
+                $product_detail['id'] = $product_detail['id'] ?? 0;
+                $product_detail['imei_number'] = $product_detail['imei_number'] ?? null;
+                $product_detail['product_variant_id'] = $product_detail['product_variant_id'] ?? null;
+                $no_unit = $product_detail['no_unit'] ?? 1;
 
-                if($product_detail['no_unit'] !== 0 || $get_type_product == 'is_service'){
+                if($no_unit !== 0 || $get_type_product == 'is_service'){
 
                     $unit_prod = Unit::where('id', $product_detail['sale_unit_id'])->first();
 
@@ -412,8 +446,14 @@ class SalesReturnController extends BaseController
 
             }
 
-            $due = $request['GrandTotal'] - $current_SaleReturn->paid_amount;
-            if ($due === 0.0 || $due < 0.0) {
+            // If the new GrandTotal is less than what was already paid, cap paid_amount
+            $paid_amount = $current_SaleReturn->paid_amount;
+            if ($paid_amount > $request['GrandTotal']) {
+                $paid_amount = $request['GrandTotal'];
+            }
+
+            $due = $request['GrandTotal'] - $paid_amount;
+            if (round($due, 2) <= 0) {
                 $payment_statut = 'paid';
             } else if ($due != $request['GrandTotal']) {
                 $payment_statut = 'partial';
@@ -423,6 +463,8 @@ class SalesReturnController extends BaseController
 
             $current_SaleReturn->update([
                 'date' => $request['date'],
+                'client_id' => $client_id,
+                'warehouse_id' => $warehouse_id,
                 'notes' => $request['notes'],
                 'statut' => $request['statut'],
                 'tax_rate' => $request['tax_rate'],
@@ -430,6 +472,7 @@ class SalesReturnController extends BaseController
                 'discount' => $request['discount'],
                 'shipping' => $request['shipping'],
                 'GrandTotal' => $request['GrandTotal'],
+                'paid_amount' => $paid_amount,
                 'payment_statut' => $payment_statut,
             ]);
 
@@ -739,7 +782,7 @@ class SalesReturnController extends BaseController
 
                 if($product_unit_sale_id['unitSale']){
                     $unit = Unit::where('id', $product_unit_sale_id['unitSale']->id)->first();
-                }{
+                }else{
                     $unit = NULL;
                 }
 
@@ -859,7 +902,7 @@ class SalesReturnController extends BaseController
 
                 if($product_unit_sale_id['unitSale']){
                     $unit = Unit::where('id', $product_unit_sale_id['unitSale']->id)->first();
-                }{
+                }else{
                     $unit = NULL;
                 }
 
@@ -980,7 +1023,7 @@ class SalesReturnController extends BaseController
 
                 if($product_unit_sale_id['unitSale']){
                     $unit = Unit::where('id', $product_unit_sale_id['unitSale']->id)->first();
-                }{
+                }else{
                     $unit = NULL;
                 }
 
@@ -1067,9 +1110,14 @@ class SalesReturnController extends BaseController
             $this->authorizeForUser($request->user('api'), 'check_record', $SaleReturn);
         }
       
+        $Return_detail['id'] = $SaleReturn->id;
+        $Return_detail['Ref'] = $SaleReturn->Ref;
         $Return_detail['client_id'] = $SaleReturn->client_id;
+        $Return_detail['client_name'] = optional($SaleReturn->client)->name;
         $Return_detail['warehouse_id'] = $SaleReturn->warehouse_id;
-        $Return_detail['sale_id'] = $SaleReturn->sale_id?$SaleReturn['sale']->id:NULL;
+        $Return_detail['warehouse_name'] = optional($SaleReturn->warehouse)->name;
+        $Return_detail['paid_amount'] = $SaleReturn->paid_amount;
+        $Return_detail['sale_id'] = $SaleReturn->sale_id && $SaleReturn['sale'] ? $SaleReturn['sale']->id : NULL;
         $Return_detail['sale_ref'] = $SaleReturn['sale']?$SaleReturn['sale']->Ref:'---';
         $Return_detail['date'] = $SaleReturn->date;
         $Return_detail['tax_rate'] = $SaleReturn->tax_rate;
@@ -1093,7 +1141,7 @@ class SalesReturnController extends BaseController
 
                 if($product_unit_sale_id['unitSale']){
                     $unit = Unit::where('id', $product_unit_sale_id['unitSale']->id)->first();
-                }{
+                }else{
                     $unit = NULL;
                 }
 
@@ -1132,12 +1180,25 @@ class SalesReturnController extends BaseController
             $data['id'] = $detail->id;
             $data['detail_id'] = $detail_id += 1;
 
-            $sell_detail = SaleDetail::where('sale_id', $sale_id)
-            ->where('product_id', $detail->product_id)
-            ->where('product_variant_id', $detail->product_variant_id)
-            ->first();
-
-            $data['sale_quantity'] = $sell_detail->quantity;
+            if($sale_id && $sale_id !== 'null'){
+                $sell_detail = SaleDetail::where('sale_id', $sale_id)
+                ->where('product_id', $detail->product_id)
+                ->where('product_variant_id', $detail->product_variant_id)
+                ->first();
+                $data['sale_quantity'] = $sell_detail ? $sell_detail->quantity : $detail->quantity;
+            }else{
+                // Standalone return (no associated sale) - use the return's own quantity as the max
+                $data['sale_quantity'] = $detail->quantity;
+            }
+            // Current stock in the return's warehouse (base unit + sale unit)
+            $data['fix_stock'] = $item_product ? $item_product->qte : 0;
+            if ($item_product && $unit) {
+                $data['stock'] = $unit->operator == '/'
+                    ? $item_product->qte * $unit->operator_value
+                    : $item_product->qte / $unit->operator_value;
+            } else {
+                $data['stock'] = $item_product ? $item_product->qte : 0;
+            }
             $data['product_type'] = $detail['product']['type'];
             $data['quantity'] = $detail->quantity;
             $data['product_id'] = $detail->product_id;
@@ -1173,12 +1234,149 @@ class SalesReturnController extends BaseController
             $details[] = $data;
         }
 
+        // Standalone return: client and warehouse are editable, send the lists
+        $clients = [];
+        $warehouses = [];
+        if (!$Return_detail['sale_id']) {
+            $clients = Client::where('deleted_at', '=', null)->get(['id', 'name']);
+
+            $user_auth = auth()->user();
+            if ($user_auth->is_all_warehouses) {
+                $warehouses = Warehouse::where('deleted_at', '=', null)->get(['id', 'name']);
+            } else {
+                $warehouses_id = UserWarehouse::where('user_id', $user_auth->id)->pluck('warehouse_id')->toArray();
+                $warehouses = Warehouse::where('deleted_at', '=', null)->whereIn('id', $warehouses_id)->get(['id', 'name']);
+            }
+        }
+
         return response()->json([
             'details' => $details,
             'sale_return' => $Return_detail,
+            'clients' => $clients,
+            'warehouses' => $warehouses,
         ]);
     }
 
+    //------------- Message tags for a sale return (email / SMS) -----------\\
 
+    private function Return_Message_Tags($SaleReturn)
+    {
+        $helpers = new helpers();
+        $currency = $helpers->Get_Currency();
+        $settings = Setting::where('deleted_at', '=', null)->first();
+
+        return [
+            '{contact_name}' => $SaleReturn['client']->name,
+            '{business_name}' => $settings ? $settings->CompanyName : '',
+            '{invoice_url}' => url('/api/return_sale_pdf/' . $SaleReturn->id . '?' . Str::random(10)),
+            '{invoice_number}' => $SaleReturn->Ref,
+            '{total_amount}' => $currency . ' ' . number_format($SaleReturn->GrandTotal, 2, '.', ','),
+            '{paid_amount}' => $currency . ' ' . number_format($SaleReturn->paid_amount, 2, '.', ','),
+            '{due_amount}' => $currency . ' ' . number_format($SaleReturn->GrandTotal - $SaleReturn->paid_amount, 2, '.', ','),
+        ];
+    }
+
+    //------------- Send sale return on Email -----------\\
+
+    public function Send_Email(Request $request)
+    {
+        $this->authorizeForUser($request->user('api'), 'view', SaleReturn::class);
+
+        $SaleReturn = SaleReturn::with('client')->where('deleted_at', '=', null)->findOrFail($request->id);
+
+        $receiver_email = $SaleReturn['client'] ? $SaleReturn['client']->email : null;
+        if (!$receiver_email || !filter_var($receiver_email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json(['success' => false, 'message' => 'client_email_missing'], 422);
+        }
+
+        // Custom message "sale_return" if it exists, otherwise a default text
+        $emailMessage = EmailMessage::where('name', 'sale_return')->first();
+        $message_subject = $emailMessage ? $emailMessage->subject : 'مرتجع البيع {invoice_number}';
+        $message_body = $emailMessage ? $emailMessage->body :
+            '<p>مرحبا {contact_name}،</p>'
+            . '<p>تجدون رفقته مرتجع البيع رقم <strong>{invoice_number}</strong> بمبلغ <strong>{total_amount}</strong>'
+            . ' (المدفوع: {paid_amount} - المتبقي: {due_amount}).</p>'
+            . '<p><a href="{invoice_url}">تحميل المرتجع PDF</a></p>'
+            . '<p>{business_name}</p>';
+
+        $tags = $this->Return_Message_Tags($SaleReturn);
+
+        $email['subject'] = strtr($message_subject, $tags);
+        $email['body'] = strtr($message_body, $tags);
+        $email['company_name'] = $tags['{business_name}'];
+
+        $this->Set_config_mail();
+
+        try {
+            Mail::to($receiver_email)->send(new CustomEmail($email));
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    //------------- Send sale return by SMS -----------\\
+
+    public function Send_SMS(Request $request)
+    {
+        $this->authorizeForUser($request->user('api'), 'view', SaleReturn::class);
+
+        $SaleReturn = SaleReturn::with('client')->where('deleted_at', '=', null)->findOrFail($request->id);
+
+        $receiverNumber = $SaleReturn['client'] ? $SaleReturn['client']->phone : null;
+        if (!$receiverNumber) {
+            return response()->json(['success' => false, 'message' => 'client_phone_missing'], 422);
+        }
+
+        $settings = Setting::where('deleted_at', '=', null)->first();
+        $default_sms_gateway = $settings ? sms_gateway::where('id', $settings->sms_gateway)
+            ->where('deleted_at', '=', null)->first() : null;
+        if (!$default_sms_gateway) {
+            return response()->json(['success' => false, 'message' => 'sms_gateway_missing'], 422);
+        }
+
+        // Custom message "sale_return" if it exists, otherwise a default text
+        $smsMessage = SMSMessage::where('name', 'sale_return')->first();
+        $message_text = $smsMessage ? $smsMessage->text :
+            'مرحبا {contact_name}، مرتجع البيع {invoice_number} بمبلغ {total_amount}. {invoice_url} - {business_name}';
+        $message_text = strtr($message_text, $this->Return_Message_Tags($SaleReturn));
+
+        try {
+            if ($default_sms_gateway->title == "twilio") {
+                $client = new Client_Twilio(env("TWILIO_SID"), env("TWILIO_TOKEN"));
+                $client->messages->create($receiverNumber, [
+                    'from' => env("TWILIO_FROM"),
+                    'body' => $message_text,
+                ]);
+            } elseif ($default_sms_gateway->title == "nexmo") {
+                $basic = new \Nexmo\Client\Credentials\Basic(env("NEXMO_KEY"), env("NEXMO_SECRET"));
+                $client = new \Nexmo\Client($basic);
+                $client->message()->send([
+                    'to' => $receiverNumber,
+                    'from' => env("NEXMO_FROM"),
+                    'text' => $message_text,
+                ]);
+            } elseif ($default_sms_gateway->title == "infobip") {
+                $configuration = (new Configuration())
+                    ->setHost(env("base_url"))
+                    ->setApiKeyPrefix('Authorization', 'App')
+                    ->setApiKey('Authorization', env("api_key"));
+
+                $sendSmsApi = new SendSMSApi(new Client_guzzle(), $configuration);
+                $destination = (new SmsDestination())->setTo($receiverNumber);
+                $message = (new SmsTextualMessage())
+                    ->setFrom(env("sender_from"))
+                    ->setText($message_text)
+                    ->setDestinations([$destination]);
+
+                $sendSmsApi->sendSmsMessage((new SmsAdvancedTextualRequest())->setMessages([$message]));
+            }
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['success' => true]);
+    }
 
 }

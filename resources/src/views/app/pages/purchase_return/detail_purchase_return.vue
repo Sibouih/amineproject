@@ -286,6 +286,10 @@ export default {
           this.details = response.data.details;
           this.company = response.data.company;
           this.isLoading = false;
+          // Opened from the list "Print" action
+          if (this.$route.query.print) {
+            this.$nextTick(() => setTimeout(() => this.print(), 300));
+          }
         })
         .catch(response => {
           setTimeout(() => {

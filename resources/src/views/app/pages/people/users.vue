@@ -327,7 +327,7 @@
             </b-col>
 
             <b-col md="8" sm="8">
-              <label class="checkbox checkbox-primary mb-3"><input type="checkbox" v-model="user.is_all_warehouses"><h5>{{$t('All_Warehouses')}} <i v-b-tooltip.hover.bottom title="If 'All Warehouses' Selected , User Can access all data for the selected Warehouses" class="text-info font-weight-bold i-Speach-BubbleAsking"></i></h5><span class="checkmark"></span></label>
+              <label class="checkbox checkbox-primary mb-3"><input type="checkbox" v-model="user.is_all_warehouses" @change="All_Warehouses_Changed"><h5>{{$t('All_Warehouses')}} <i v-b-tooltip.hover.bottom title="If 'All Warehouses' Selected , User Can access all data for the selected Warehouses" class="text-info font-weight-bold i-Speach-BubbleAsking"></i></h5><span class="checkmark"></span></label>
                
                <b-form-group class="mt-2" :label="$t('Some_warehouses')">
                   <v-select
@@ -338,7 +338,84 @@
                     :placeholder="$t('PleaseSelect')"
                     :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
                   />
+                  <!-- "All warehouses" wins over the list: say it when both are set -->
+                  <small v-if="user.is_all_warehouses && assigned_warehouses.length" class="text-danger d-block mt-1">
+                    {{ $t('PosNext.user_wh_conflict') }}
+                  </small>
                 </b-form-group>
+            </b-col>
+
+            <!-- Point of sale: customers and warehouse used by this user in the POS -->
+            <b-col md="12"><hr class="mt-2 mb-3"></b-col>
+            <b-col md="4" sm="4">
+              <h5>{{$t('PosNext.user_pos_title')}}</h5>
+              <p class="text-muted small">{{$t('PosNext.user_pos_help')}}</p>
+            </b-col>
+            <b-col md="8" sm="8">
+              <label class="checkbox checkbox-primary mb-1">
+                <input type="checkbox" v-model="pos.pos_only">
+                <h5>{{ $t('PosNext.user_pos_only') }}</h5>
+                <span class="checkmark"></span>
+              </label>
+              <p class="text-muted small mb-3">{{ $t('PosNext.user_pos_only_help') }}</p>
+
+              <!-- what the user may change in the POS cart -->
+              <label class="checkbox checkbox-primary mb-1">
+                <input type="checkbox" v-model="pos.pos_edit_price">
+                <h5>{{ $t('PosNext.user_pos_edit_price') }}</h5>
+                <span class="checkmark"></span>
+              </label>
+              <p class="text-muted small mb-2">{{ $t('PosNext.user_pos_edit_price_help') }}</p>
+              <label class="checkbox checkbox-primary mb-1">
+                <input type="checkbox" v-model="pos.pos_edit_confirmed">
+                <h5>{{ $t('PosNext.user_pos_edit_confirmed') }}</h5>
+                <span class="checkmark"></span>
+              </label>
+              <p class="text-muted small mb-3">{{ $t('PosNext.user_pos_edit_confirmed_help') }}</p>
+
+              <b-form-group :label="$t('PosNext.user_pos_customers')">
+                <b-form-radio-group
+                  v-model="pos.all_clients"
+                  :options="[{text: $t('PosNext.user_pos_all_clients'), value: 1}, {text: $t('PosNext.user_pos_some_clients'), value: 0}]"
+                />
+              </b-form-group>
+              <b-form-group v-if="!pos.all_clients">
+                <v-select
+                  multiple
+                  v-model="pos.clients"
+                  :reduce="c => c.id"
+                  label="name"
+                  :options="clients"
+                  :placeholder="$t('PleaseSelect')"
+                />
+                <small class="text-muted">
+                  {{ pos.clients.length === 1 ? $t('PosNext.user_pos_one_client') : $t('PosNext.user_pos_many_clients') }}
+                </small>
+              </b-form-group>
+              <b-row>
+                <b-col md="6" v-if="pos.all_clients || pos.clients.length !== 1">
+                  <b-form-group :label="$t('PosNext.user_pos_default_client')">
+                    <v-select
+                      v-model="pos.default_client_id"
+                      :reduce="c => c.id"
+                      label="name"
+                      :options="posClientOptions"
+                      :placeholder="$t('PosNext.user_pos_company_default')"
+                    />
+                  </b-form-group>
+                </b-col>
+                <b-col md="6">
+                  <b-form-group :label="$t('PosNext.user_pos_default_warehouse')">
+                    <v-select
+                      v-model="pos.default_warehouse_id"
+                      :reduce="w => w.id"
+                      label="name"
+                      :options="posWarehouseOptions"
+                      :placeholder="$t('PosNext.user_pos_company_default')"
+                    />
+                  </b-form-group>
+                </b-col>
+              </b-row>
             </b-col>
 
             <b-col md="12" class="mt-3">
@@ -406,11 +483,30 @@ export default {
         is_all_warehouses:1,
       },
       assigned_warehouses:[],
+      clients: [],
+      // POS settings of the user (customers allowed in the POS, defaults)
+      pos: {
+        pos_only: false,
+        pos_edit_price: false,
+        pos_edit_confirmed: false,
+        all_clients: 1,
+        clients: [],
+        default_client_id: null,
+        default_warehouse_id: null,
+      },
     };
   },
 
   computed: {
     ...mapGetters(["currentUserPermissions"]),
+    posClientOptions() {
+      if (this.pos.all_clients) return this.clients;
+      return this.clients.filter(c => this.pos.clients.includes(c.id));
+    },
+    posWarehouseOptions() {
+      if (this.user.is_all_warehouses) return this.warehouses;
+      return this.warehouses.filter(w => this.assigned_warehouses.includes(w.id));
+    },
     columns() {
       return [
         {
@@ -551,6 +647,16 @@ export default {
     Selected_Warehouse(value) {
           if (!value.length) {
               this.assigned_warehouses = [];
+          } else {
+              // choosing warehouses means "only these": "All warehouses" is unticked
+              this.user.is_all_warehouses = false;
+          }
+      },
+
+    All_Warehouses_Changed(event) {
+          // "All warehouses" ticked: the list of warehouses no longer applies
+          if (event.target.checked) {
+              this.assigned_warehouses = [];
           }
       },
 
@@ -653,6 +759,7 @@ export default {
           this.users = response.data.users;
           this.roles = response.data.roles;
           this.warehouses = response.data.warehouses;
+          this.clients = response.data.clients || [];
           this.totalRows = response.data.totalRows;
 
           // Complete the animation of theprogress bar.
@@ -692,6 +799,15 @@ export default {
             .get("/users/"+id+"/edit")
             .then(response => {
                 this.assigned_warehouses   = response.data.assigned_warehouses;
+                this.pos = {
+                  pos_only: response.data.pos_only === 1,
+                  pos_edit_price: response.data.pos_edit_price === 1,
+                  pos_edit_confirmed: response.data.pos_edit_confirmed === 1,
+                  all_clients: response.data.pos_all_clients === 0 ? 0 : 1,
+                  clients: response.data.pos_clients || [],
+                  default_client_id: response.data.pos_default_client_id || null,
+                  default_warehouse_id: response.data.pos_default_warehouse_id || null,
+                };
             })
             .catch(error => {
             });
@@ -731,6 +847,7 @@ export default {
       }else{
         self.data.append("assigned_to", []);
       }
+      self.append_Pos_Settings();
 
       axios
         .post("users", self.data)
@@ -776,6 +893,7 @@ export default {
       }else{
         self.data.append("assigned_to", []);
       }
+      self.append_Pos_Settings();
       self.data.append("_method", "put");
 
       axios
@@ -816,7 +934,24 @@ export default {
       };
       this.data= new FormData();
       this.assigned_warehouses = [];
+      this.pos = { pos_only: false, pos_edit_price: false, pos_edit_confirmed: false, all_clients: 1, clients: [], default_client_id: null, default_warehouse_id: null };
       this.email_exist= "";
+    },
+
+    //----------------------------- POS settings sent with the user ---------------------------\
+    append_Pos_Settings() {
+      const all = this.pos.all_clients || !this.pos.clients.length ? 1 : 0;
+      this.data.append("pos_only", this.pos.pos_only ? 1 : 0);
+      this.data.append("pos_edit_price", this.pos.pos_edit_price ? 1 : 0);
+      this.data.append("pos_edit_confirmed", this.pos.pos_edit_confirmed ? 1 : 0);
+      this.data.append("pos_all_clients", all);
+      if (!all) {
+        for (var i = 0; i < this.pos.clients.length; i++) {
+          this.data.append("pos_clients[" + i + "]", this.pos.clients[i]);
+        }
+      }
+      this.data.append("pos_default_client_id", this.pos.default_client_id || "");
+      this.data.append("pos_default_warehouse_id", this.pos.default_warehouse_id || "");
     },
 
     //--------------------------------- Remove User ---------------------------\\

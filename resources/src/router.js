@@ -1307,7 +1307,14 @@ Router.prototype.push = function push(location, onResolve, onReject) {
     return originalPush.call(this, location).catch(err => err);
 };
 
+// "POS only" users (users.pos_only) can open nothing but the POS
+const isPosPath = path => path === "/app/pos" || path.indexOf("/app/pos/") === 0;
+
 router.beforeEach((to, from, next) => {
+    const authUser = store.getters.currentUser;
+    if (authUser && authUser.pos_only && !isPosPath(to.path)) {
+        return next("/app/pos");
+    }
     // If this isn't an initial page load.
     if (to.path) {
         // Start the route progress bar.
@@ -1329,6 +1336,20 @@ router.beforeEach((to, from, next) => {
         });
     } else {
         next();
+    }
+});
+
+// After a deploy, a tab opened before it may ask for a code file that no longer exists:
+// reload once so it gets the new version (no cache to clear by hand).
+router.onError(error => {
+    const text = String((error && error.message) || error);
+    if (/Loading chunk|ChunkLoadError|Loading CSS chunk/i.test(text)) {
+        let last = 0;
+        try { last = parseInt(sessionStorage.getItem("app_chunk_reload") || "0", 10); } catch (e) { last = 0; }
+        if (Date.now() - last > 10000) {
+            try { sessionStorage.setItem("app_chunk_reload", String(Date.now())); } catch (e) { /* storage unavailable */ }
+            window.location.reload();
+        }
     }
 });
 

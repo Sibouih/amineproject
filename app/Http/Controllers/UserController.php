@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
@@ -74,11 +75,14 @@ class UserController extends BaseController
 
         $roles = Role::where('deleted_at', null)->get(['id', 'name']);
         $warehouses = Warehouse::where('deleted_at', '=', null)->get(['id', 'name']);
+        // customers offered in the "Point of sale" section of the user form
+        $clients = Client::where('deleted_at', '=', null)->orderBy('name')->get(['id', 'name']);
 
         return response()->json([
             'users' => $users,
             'roles' => $roles,
             'warehouses' => $warehouses,
+            'clients' => $clients,
             'totalRows' => $totalRows,
         ]);
     }
@@ -90,6 +94,8 @@ class UserController extends BaseController
         $helpers = new helpers();
         $user['avatar'] = Auth::user()->avatar;
         $user['username'] = Auth::user()->username;
+        // 1 = this user can only use the POS (front redirects there)
+        $user['pos_only'] = (int) Auth::user()->pos_only;
         $user['currency'] = $helpers->Get_Currency();
         $user['logo'] = Setting::first()->logo;
         $user['default_language'] = Setting::first()->default_language;
@@ -196,7 +202,9 @@ class UserController extends BaseController
             if(!$User->is_all_warehouses){
                 $User->assignedWarehouses()->sync($request['assigned_to']);
             }
-    
+
+            $this->savePosSettings($User, $request);
+
         }, 10);
 
         return response()->json(['success' => true]);
@@ -216,8 +224,79 @@ class UserController extends BaseController
         $assigned_warehouses = UserWarehouse::where('user_id', $id)->pluck('warehouse_id')->toArray();
         $warehouses = Warehouse::where('deleted_at', '=', null)->whereIn('id', $assigned_warehouses)->pluck('id')->toArray();
 
+        $user = User::findOrFail($id);
+        $pos_clients = $user->posClients()->where('clients.deleted_at', '=', null)->pluck('clients.id')->toArray();
+
         return response()->json([
             'assigned_warehouses' => $warehouses,
+            'pos_all_clients' => $user->pos_all_clients === null ? 1 : (int) $user->pos_all_clients,
+            'pos_clients' => $pos_clients,
+            'pos_default_client_id' => $user->pos_default_client_id,
+            'pos_default_warehouse_id' => $user->pos_default_warehouse_id,
+            'pos_only' => (int) $user->pos_only,
+            'pos_edit_price' => (int) $user->pos_edit_price,
+            'pos_edit_confirmed' => (int) $user->pos_edit_confirmed,
+        ]);
+    }
+
+    //------------- POS settings of a user (customers allowed in the POS, defaults) ---------\\
+
+    private function savePosSettings(User $user, Request $request)
+    {
+        // older forms do not send the POS section: keep what is saved
+        if (!$request->has('pos_all_clients')) {
+            return;
+        }
+
+        $all_clients = in_array((string) $request['pos_all_clients'], ['1', 'true'], true) ? 1 : 0;
+
+        $client_ids = [];
+        if (!$all_clients) {
+            $client_ids = Client::where('deleted_at', '=', null)
+                ->whereIn('id', array_filter((array) $request['pos_clients']))
+                ->pluck('id')->toArray();
+            // no customer chosen = no restriction
+            if (!count($client_ids)) {
+                $all_clients = 1;
+            }
+        }
+        $user->posClients()->sync($all_clients ? [] : $client_ids);
+
+        // default customer must be one the user can use
+        $default_client = $request['pos_default_client_id'] ? (int) $request['pos_default_client_id'] : null;
+        if ($default_client) {
+            $ok = $all_clients
+                ? Client::where('deleted_at', '=', null)->where('id', $default_client)->exists()
+                : in_array($default_client, $client_ids);
+            if (!$ok) {
+                $default_client = null;
+            }
+        }
+        if (!$all_clients && count($client_ids) == 1) {
+            $default_client = $client_ids[0];
+        }
+
+        // default POS warehouse must be one of the user's warehouses
+        $default_warehouse = $request['pos_default_warehouse_id'] ? (int) $request['pos_default_warehouse_id'] : null;
+        if ($default_warehouse) {
+            $query = Warehouse::where('deleted_at', '=', null)->where('id', $default_warehouse);
+            if (!$user->is_all_warehouses) {
+                $query->whereIn('id', UserWarehouse::where('user_id', $user->id)->pluck('warehouse_id')->toArray());
+            }
+            if (!$query->exists()) {
+                $default_warehouse = null;
+            }
+        }
+
+        User::whereId($user->id)->update([
+            // never on your own account, so an admin cannot lock himself into the POS
+            'pos_only' => $user->id != Auth::id() && in_array((string) $request['pos_only'], ['1', 'true'], true) ? 1 : 0,
+            // cart permissions in the POS
+            'pos_edit_price' => in_array((string) $request['pos_edit_price'], ['1', 'true'], true) ? 1 : 0,
+            'pos_edit_confirmed' => in_array((string) $request['pos_edit_confirmed'], ['1', 'true'], true) ? 1 : 0,
+            'pos_all_clients' => $all_clients,
+            'pos_default_client_id' => $default_client,
+            'pos_default_warehouse_id' => $default_warehouse,
         ]);
     }
 
@@ -297,6 +376,8 @@ class UserController extends BaseController
 
             $user_saved = User::where('deleted_at', '=', null)->findOrFail($id);
             $user_saved->assignedWarehouses()->sync($request['assigned_to']);
+
+            $this->savePosSettings($user_saved, $request);
 
         }, 10);
         

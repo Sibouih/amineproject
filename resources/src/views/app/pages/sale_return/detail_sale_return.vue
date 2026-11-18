@@ -40,7 +40,7 @@
           </b-row>
           <hr>
           <b-row class="mt-5">
-            <b-col lg="4" md="4" sm="12" class="mb-4">
+            <b-col lg="6" md="6" sm="12" class="mb-4">
               <h5 class="font-weight-bold">{{$t('Customer_Info')}}</h5>
 
               <div>{{sale_return.client_name}}</div>
@@ -48,14 +48,7 @@
               <div>{{sale_return.client_phone}}</div>
               <div>{{sale_return.client_adr}}</div>
             </b-col>
-            <b-col lg="4" md="4" sm="12" class="mb-4">
-              <h5 class="font-weight-bold">{{$t('Company_Info')}}</h5>
-              <div>{{company.CompanyName}}</div>
-              <div>{{company.email}}</div>
-              <div>{{company.CompanyPhone}}</div>
-              <div>{{company.CompanyAdress}}</div>
-            </b-col>
-            <b-col lg="4" md="4" sm="12" class="mb-4">
+            <b-col lg="6" md="6" sm="12" class="mb-4">
               <h5 class="font-weight-bold">{{$t('Return_Info')}}</h5>
 
               <div>{{$t('Reference')}} : {{sale_return.Ref}}</div>
@@ -273,6 +266,10 @@ export default {
           this.details = response.data.details;
           this.company = response.data.company;
           this.isLoading = false;
+          // Opened from the list "Print" action
+          if (this.$route.query.print) {
+            this.$nextTick(() => setTimeout(() => this.print(), 300));
+          }
         })
         .catch(response => {
           setTimeout(() => {

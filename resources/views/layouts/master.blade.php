@@ -6,7 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <link rel=icon href=/images/favicon.ico>
-    <link rel="stylesheet" href="/css/master.css">
+    {{-- ?v = time the file was uploaded: every deploy changes the address, so no browser keeps an old copy --}}
+    <link rel="stylesheet" href="/css/master.css?v={{ @filemtime(public_path('css/master.css')) ?: '4.0.7' }}">
 
     <title>Dashboard</title>
   </head>
@@ -32,6 +33,8 @@
     </div>
 
     <script>
+      // build of the JS this page loads, compared later to detect a new version (see App.vue)
+      window.APP_BUILD = "{{ @filemtime(public_path('js/main.min.js')) ?: '' }}";
       window.config = {
         "ModulesEnabled" : @json($ModulesEnabled),
         "ModulesInstalled" : @json($ModulesInstalled),
@@ -43,7 +46,7 @@
 
     @endforeach -->
 
-    <script src="/js/main.min.js?v=4.0.7"></script>
+    <script src="/js/main.min.js?v={{ @filemtime(public_path('js/main.min.js')) ?: '4.0.7' }}"></script>
 
   </body>
 </html>

@@ -41,6 +41,47 @@
                   </b-form-group>
                 </b-col>
 
+                <!-- Supplier -->
+                <b-col lg="4" md="4" sm="12" class="mb-3">
+                  <validation-provider v-if="isStandalone" name="Supplier" :rules="{ required: true}">
+                    <b-form-group slot-scope="{ valid, errors }" :label="$t('Supplier') + ' ' + '*'">
+                      <v-select
+                        :class="{'is-invalid': !!errors.length}"
+                        :state="errors[0] ? false : (valid ? true : null)"
+                        v-model="purchase_return.supplier_id"
+                        :reduce="label => label.value"
+                        :placeholder="$t('Choose_Supplier')"
+                        :options="suppliers.map(suppliers => ({label: suppliers.name, value: suppliers.id}))"
+                      />
+                      <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                    </b-form-group>
+                  </validation-provider>
+                  <b-form-group v-else :label="$t('Supplier')">
+                    <b-form-input :value="purchase_return.supplier_name" disabled="disabled"></b-form-input>
+                  </b-form-group>
+                </b-col>
+
+                <!-- warehouse -->
+                <b-col lg="4" md="4" sm="12" class="mb-3">
+                  <validation-provider v-if="isStandalone" name="warehouse" :rules="{ required: true}">
+                    <b-form-group slot-scope="{ valid, errors }" :label="$t('warehouse') + ' ' + '*'">
+                      <v-select
+                        :class="{'is-invalid': !!errors.length}"
+                        :state="errors[0] ? false : (valid ? true : null)"
+                        @input="Selected_Warehouse"
+                        v-model="purchase_return.warehouse_id"
+                        :reduce="label => label.value"
+                        :placeholder="$t('Choose_Warehouse')"
+                        :options="warehouses.map(warehouses => ({label: warehouses.name, value: warehouses.id}))"
+                      />
+                      <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                    </b-form-group>
+                  </validation-provider>
+                  <b-form-group v-else :label="$t('warehouse')">
+                    <b-form-input :value="purchase_return.warehouse_name" disabled="disabled"></b-form-input>
+                  </b-form-group>
+                </b-col>
+
                 <!-- Status  -->
                 <b-col lg="4" md="4" sm="12" class="mb-3">
                   <validation-provider name="Status" :rules="{ required: true}">
@@ -63,23 +104,43 @@
                 </b-col>
 
 
+                <!-- Product search (standalone return only) -->
+                <b-col md="12" class="mb-5" v-if="isStandalone">
+                  <h6>{{$t('ProductName')}}</h6>
+                  <div id="autocomplete" class="autocomplete">
+                    <input
+                      :placeholder="$t('Scan_Search_Product_by_Code_Name')"
+                      @input='e => search_input = e.target.value'
+                      @keyup="search(search_input)"
+                      @focus="handleFocus"
+                      @blur="handleBlur"
+                      ref="product_autocomplete"
+                      class="autocomplete-input" />
+                    <ul class="autocomplete-result-list" v-show="focused">
+                      <li class="autocomplete-result" v-for="product_fil in product_filter" :key="product_fil.id + '-' + product_fil.product_variant_id" @mousedown="SearchProduct(product_fil)">{{getResultValue(product_fil)}}</li>
+                    </ul>
+                  </div>
+                </b-col>
+
                 <!-- Order products  -->
                 <b-col md="12">
                   <h5>{{$t('list_product_returns')}} *</h5>
                   <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover" id="products-table">
                       <thead class="bg-gray-300">
                         <tr>
                           <th scope="col">#</th>
                           <th scope="col">{{$t('ProductName')}}</th>
                           <th scope="col">{{$t('Net_Unit_Cost')}}</th>
-                          <th scope="col">{{$t('qty_purchased')}}</th>
+                          <th scope="col" v-if="!isStandalone">{{$t('qty_purchased')}}</th>
                           <th scope="col">{{$t('Current_stock')}}</th>
                           <th scope="col">{{$t('Qty_return')}}</th>
                           <th scope="col">{{$t('Discount')}}</th>
                           <th scope="col">{{$t('Tax')}}</th>
                           <th scope="col">{{$t('SubTotal')}}</th>
-                         
+                          <th scope="col" class="text-center" v-if="isStandalone">
+                            <i class="i-Close-Window text-25"></i>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -98,7 +159,7 @@
                             <span class="badge badge-success">{{detail.name}}</span>
                           </td>
                           <td>{{currentUser.currency}} {{formatNumber(detail.Net_cost, 3)}}</td>
-                          <td>
+                          <td v-if="!isStandalone">
                             <span
                               class="badge badge-outline-warning"
                             >{{detail.purchase_quantity}} {{detail.unitPurchase}}</span>
@@ -136,7 +197,11 @@
                           <td>{{currentUser.currency}} {{formatNumber(detail.DiscountNet * detail.quantity, 2)}}</td>
                           <td>{{currentUser.currency}} {{formatNumber(detail.taxe * detail.quantity , 2)}}</td>
                           <td>{{currentUser.currency}} {{detail.subtotal.toFixed(2)}}</td>
-                         
+                          <td v-if="isStandalone" class="text-center">
+                            <i v-if="currentUserPermissions && currentUserPermissions.includes('edit_product_purchase') && detail.no_unit !== 0"
+                              @click="Modal_Updat_Detail(detail)" class="i-Edit text-25 text-success cursor-pointer"></i>
+                            <i @click="delete_Product_Detail(detail.detail_id)" class="i-Close-Window text-25 text-danger cursor-pointer"></i>
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -271,6 +336,156 @@
         </b-row>
       </b-form>
     </validation-observer>
+    <!-- Modal Update detail Product -->
+    <validation-observer ref="Update_Detail">
+      <b-modal hide-footer size="lg" id="form_Update_Detail" :title="detail.name">
+        <b-form @submit.prevent="submit_Update_Detail">
+          <b-row>
+            <!-- Unit Price -->
+            <b-col lg="6" md="6" sm="12">
+              <validation-provider
+                name="Product Price"
+                :rules="{ required: true , regex: /^\d*\.?\d*$/}"
+                v-slot="validationContext"
+              >
+                <b-form-group :label="$t('ProductPrice') + ' ' + '*'" id="Price-input">
+                  <b-form-input
+                    label="Product Price"
+                    v-model="detail.Unit_cost"
+                    :state="getValidationState(validationContext)"
+                    aria-describedby="Price-feedback"
+                  ></b-form-input>
+                  <b-form-invalid-feedback id="Price-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Tax Method -->
+            <b-col lg="6" md="6" sm="12">
+              <validation-provider name="Tax Method" :rules="{ required: true}">
+                <b-form-group slot-scope="{ valid, errors }" :label="$t('TaxMethod') + ' ' + '*'">
+                  <v-select
+                    :class="{'is-invalid': !!errors.length}"
+                    :state="errors[0] ? false : (valid ? true : null)"
+                    v-model="detail.tax_method"
+                    :reduce="label => label.value"
+                    :placeholder="$t('Choose_Method')"
+                    :options="
+                           [
+                            {label: 'Exclusive', value: '1'},
+                            {label: 'Inclusive', value: '2'}
+                           ]"
+                  ></v-select>
+                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Tax Rate -->
+            <b-col lg="6" md="6" sm="12">
+              <validation-provider
+                name="Order Tax"
+                :rules="{ required: true , regex: /^\d*\.?\d*$/}"
+                v-slot="validationContext"
+              >
+                <b-form-group :label="$t('OrderTax') + ' ' + '*'">
+                  <b-input-group append="%">
+                    <b-form-input
+                      label="Order Tax"
+                      v-model="detail.tax_percent"
+                      :state="getValidationState(validationContext)"
+                      aria-describedby="OrderTax-feedback"
+                    ></b-form-input>
+                  </b-input-group>
+                  <b-form-invalid-feedback id="OrderTax-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Discount Method -->
+             <b-col lg="6" md="6" sm="12">
+              <validation-provider name="Discount Method" :rules="{ required: true}">
+                <b-form-group slot-scope="{ valid, errors }" :label="$t('Discount_Method') + ' ' + '*'">
+                  <v-select
+                    v-model="detail.discount_Method"
+                    :reduce="label => label.value"
+                    :placeholder="$t('Choose_Method')"
+                    :class="{'is-invalid': !!errors.length}"
+                    :state="errors[0] ? false : (valid ? true : null)"
+                    :options="
+                           [
+                            {label: 'Percent %', value: '1'},
+                            {label: 'Fixed', value: '2'}
+                           ]"
+                  ></v-select>
+                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Discount Rate -->
+           <b-col lg="6" md="6" sm="12">
+              <validation-provider
+                name="Discount Rate"
+                :rules="{ required: true , regex: /^\d*\.?\d*$/}"
+                v-slot="validationContext"
+              >
+                <b-form-group :label="$t('Discount') + ' ' + '*'">
+                  <b-form-input
+                    label="Discount"
+                    v-model.number="detail.discount"
+                    :state="getValidationState(validationContext)"
+                    aria-describedby="Discount-feedback"
+                  ></b-form-input>
+                  <b-form-invalid-feedback id="Discount-feedback">{{ validationContext.errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+            <!-- Unit Purchase -->
+            <b-col lg="6" md="6" sm="12" v-if="detail.product_type != 'is_service'">
+              <validation-provider name="Unit Purchase" :rules="{ required: true}">
+                <b-form-group slot-scope="{ valid, errors }" :label="$t('UnitPurchase') + ' ' + '*'">
+                  <v-select
+                    :class="{'is-invalid': !!errors.length}"
+                    :state="errors[0] ? false : (valid ? true : null)"
+                    v-model="detail.purchase_unit_id"
+                    :placeholder="$t('Choose_Unit_Purchase')"
+                    :reduce="label => label.value"
+                    :options="units.map(units => ({label: units.name, value: units.id}))"
+                  />
+                  <b-form-invalid-feedback>{{ errors[0] }}</b-form-invalid-feedback>
+                </b-form-group>
+              </validation-provider>
+            </b-col>
+
+             <!-- Imei or serial numbers -->
+              <b-col lg="12" md="12" sm="12" v-show="detail.is_imei">
+                <b-form-group :label="$t('Add_product_IMEI_Serial_number')">
+                  <b-form-input
+                    label="Add_product_IMEI_Serial_number"
+                    v-model="detail.imei_number"
+                    :placeholder="$t('Add_product_IMEI_Serial_number')"
+                  ></b-form-input>
+                </b-form-group>
+            </b-col>
+
+            <b-col md="12">
+              <b-form-group>
+                <b-button
+                  variant="primary"
+                  type="submit"
+                  :disabled="Submit_Processing_detail"
+                ><i class="i-Yes me-2 font-weight-bold"></i> {{$t('submit')}}</b-button>
+                <div v-once class="typo__p" v-if="Submit_Processing_detail">
+                  <div class="spinner sm spinner-primary mt-3"></div>
+                </div>
+              </b-form-group>
+            </b-col>
+          </b-row>
+        </b-form>
+      </b-modal>
+    </validation-observer>
 
   </div>
 </template>
@@ -287,8 +502,18 @@ export default {
     return {
       isLoading: true,
       SubmitProcessing:false,
+      Submit_Processing_detail: false,
       details: [],
       detail: {},
+      product: {},
+      suppliers: [],
+      warehouses: [],
+      products: [],
+      units: [],
+      search_input: "",
+      product_filter: [],
+      focused: false,
+      timer: null,
       purchase_return: {
         id: "",
         date: "",
@@ -308,10 +533,266 @@ export default {
   },
 
   computed: {
-    ...mapGetters(["currentUser"])
+    ...mapGetters(["currentUserPermissions", "currentUser"]),
+
+    // Return created without a purchase: every field is editable (like the create form)
+    isStandalone() {
+      return !this.purchase_return.purchase_id;
+    }
   },
 
   methods: {
+
+    handleFocus() {
+      this.focused = true;
+    },
+
+    handleBlur() {
+      this.focused = false;
+    },
+
+    //---Submit Validation Update Detail
+    submit_Update_Detail() {
+      this.$refs.Update_Detail.validate().then(success => {
+        if (success) {
+          this.Update_Detail();
+        }
+      });
+    },
+
+    //---------------------- get_units ------------------------------\\
+    get_units(value) {
+      axios
+        .get("get_units?id=" + value)
+        .then(({ data }) => (this.units = data));
+    },
+
+    //------ Show Modal Update Detail Product
+    Modal_Updat_Detail(detail) {
+      NProgress.start();
+      NProgress.set(0.1);
+      this.detail = {};
+      this.get_units(detail.product_id);
+      this.detail.detail_id = detail.detail_id;
+      this.detail.purchase_unit_id = detail.purchase_unit_id;
+      this.detail.product_type = detail.product_type;
+      this.detail.name = detail.name;
+      this.detail.Unit_cost = detail.Unit_cost;
+      this.detail.fix_stock = detail.fix_stock;
+      this.detail.stock = detail.stock;
+      this.detail.tax_method = detail.tax_method;
+      this.detail.discount_Method = detail.discount_Method;
+      this.detail.discount = detail.discount;
+      this.detail.quantity = detail.quantity;
+      this.detail.tax_percent = detail.tax_percent;
+      this.detail.is_imei = detail.is_imei;
+      this.detail.imei_number = detail.imei_number;
+
+      setTimeout(() => {
+        NProgress.done();
+        this.$bvModal.show("form_Update_Detail");
+      }, 1000);
+    },
+
+    //------ Submit Update Detail Product
+    Update_Detail() {
+      NProgress.start();
+      NProgress.set(0.1);
+      this.Submit_Processing_detail = true;
+      for (var i = 0; i < this.details.length; i++) {
+        if (this.details[i].detail_id === this.detail.detail_id) {
+
+          for (var k = 0; k < this.units.length; k++) {
+            if (this.units[k].id == this.detail.purchase_unit_id) {
+              if (this.units[k].operator == '/') {
+                this.details[i].stock = this.detail.fix_stock * this.units[k].operator_value;
+              } else {
+                this.details[i].stock = this.detail.fix_stock / this.units[k].operator_value;
+              }
+              this.details[i].unitPurchase = this.units[k].ShortName;
+            }
+          }
+
+          this.details[i].Unit_cost = this.detail.Unit_cost;
+          this.details[i].tax_percent = this.detail.tax_percent;
+          this.details[i].tax_method = this.detail.tax_method;
+          this.details[i].discount_Method = this.detail.discount_Method;
+          this.details[i].discount = this.detail.discount;
+          this.details[i].purchase_unit_id = this.detail.purchase_unit_id;
+          this.details[i].imei_number = this.detail.imei_number;
+
+          if (this.details[i].discount_Method == "2") {
+            //Fixed
+            this.details[i].DiscountNet = this.details[i].discount;
+          } else {
+            //Percentage %
+            this.details[i].DiscountNet = parseFloat(
+              (this.details[i].Unit_cost * this.details[i].discount) / 100
+            );
+          }
+
+          if (this.details[i].tax_method == "1") {
+            //Exclusive
+            this.details[i].Net_cost = parseFloat(
+              this.details[i].Unit_cost - this.details[i].DiscountNet
+            );
+            this.details[i].taxe = parseFloat(
+              (this.details[i].tax_percent *
+                (this.details[i].Unit_cost - this.details[i].DiscountNet)) /
+                100
+            );
+          } else {
+            //Inclusive
+            this.details[i].Net_cost = parseFloat(
+              (this.details[i].Unit_cost - this.details[i].DiscountNet) /
+                (this.details[i].tax_percent / 100 + 1)
+            );
+            this.details[i].taxe = parseFloat(
+              this.details[i].Unit_cost -
+                this.details[i].Net_cost -
+                this.details[i].DiscountNet
+            );
+          }
+
+          this.$forceUpdate();
+        }
+      }
+      this.Calcul_Total();
+
+      setTimeout(() => {
+        NProgress.done();
+        this.Submit_Processing_detail = false;
+        this.$bvModal.hide("form_Update_Detail");
+      }, 1000);
+    },
+
+    // Search Products
+    search() {
+      if (this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+      }
+
+      if (this.search_input.length < 2) {
+        return (this.product_filter = []);
+      }
+
+      if (this.purchase_return.warehouse_id != "" && this.purchase_return.warehouse_id != null) {
+        this.timer = setTimeout(() => {
+          const product_filter = this.products.filter(
+            product => product.code === this.search_input || (product.barcode || "").includes(this.search_input)
+          );
+          if (product_filter.length === 1) {
+            this.SearchProduct(product_filter[0]);
+          } else {
+            this.product_filter = this.products.filter(product => {
+              return (
+                product.name.toLowerCase().includes(this.search_input.toLowerCase()) ||
+                product.code.toLowerCase().includes(this.search_input.toLowerCase()) ||
+                (product.barcode || "").toLowerCase().includes(this.search_input.toLowerCase())
+              );
+            });
+          }
+        }, 800);
+      } else {
+        this.makeToast("warning", this.$t("SelectWarehouse"), this.$t("Warning"));
+      }
+    },
+
+    getResultValue(result) {
+      return result.code + " " + "(" + result.name + ")";
+    },
+
+    //------------------------- Submit Search Product
+    SearchProduct(result) {
+      if (this.details.some(d => d.product_id === result.id && (d.product_variant_id || null) === (result.product_variant_id || null))) {
+        this.makeToast("warning", this.$t("AlreadyAdd"), this.$t("Warning"));
+      } else {
+        this.product = {};
+        this.product.code = result.code;
+        this.product.stock = result.qte_purchase;
+        this.product.fix_stock = result.qte;
+        this.product.quantity = result.qte_purchase < 1 ? result.qte_purchase : 1;
+        this.product.product_variant_id = result.product_variant_id;
+        this.Get_Product_Details(result.id, result.product_variant_id);
+      }
+
+      this.search_input = '';
+      this.$refs.product_autocomplete.value = "";
+      this.product_filter = [];
+    },
+
+    //---------------------- Event Select Warehouse ------------------------------\\
+    Selected_Warehouse(value) {
+      this.search_input = '';
+      this.product_filter = [];
+      if (value) {
+        this.Get_Products_By_Warehouse(value);
+      } else {
+        this.products = [];
+      }
+    },
+
+    //------------------------------------ Get Products By Warehouse -------------------------\\
+    Get_Products_By_Warehouse(id) {
+      NProgress.start();
+      NProgress.set(0.1);
+      axios
+        .get("get_Products_by_warehouse/" + id + "?stock=" + 0 + "&is_purchase=" + 1 + "&product_service=" + 0)
+        .then(response => {
+          this.products = response.data;
+          NProgress.done();
+        })
+        .catch(error => {
+          NProgress.done();
+        });
+    },
+
+    //---------------------------------Get Product Details ------------------------\\
+    Get_Product_Details(product_id, variant_id) {
+      axios.get("/show_product_data/" + product_id + "/" + variant_id).then(response => {
+        this.product.id = 0;
+        this.product.no_unit = 1;
+        this.product.del = 0;
+        this.product.discount = 0;
+        this.product.DiscountNet = 0;
+        this.product.discount_Method = "2";
+        this.product.product_id = response.data.id;
+        this.product.product_type = response.data.product_type;
+        this.product.name = response.data.name;
+        // purchase return lines are valued at cost
+        this.product.Unit_cost = response.data.Unit_cost;
+        this.product.Net_cost = response.data.Net_cost;
+        this.product.taxe = response.data.tax_cost;
+        this.product.tax_method = response.data.tax_method;
+        this.product.tax_percent = response.data.tax_percent;
+        this.product.unitPurchase = response.data.unitPurchase;
+        this.product.purchase_unit_id = response.data.purchase_unit_id;
+        this.product.is_imei = response.data.is_imei;
+        this.product.imei_number = '';
+        this.product.quantity_copy = this.product.quantity;
+        this.product.detail_id = this.details.length > 0
+          ? Math.max(...this.details.map(d => d.detail_id)) + 1
+          : 1;
+
+        this.details.push(this.product);
+        if (this.product.is_imei) {
+          this.Modal_Updat_Detail(this.product);
+        }
+        this.Calcul_Total();
+      });
+    },
+
+    //-----------------------------------Delete Detail Product ------------------------------\\
+    delete_Product_Detail(id) {
+      for (var i = 0; i < this.details.length; i++) {
+        if (id === this.details[i].detail_id) {
+          this.details.splice(i, 1);
+          this.Calcul_Total();
+          break;
+        }
+      }
+    },
 
     //--- Submit Validate Update Purchase Return
     Submit_purchase_return() {
@@ -351,7 +832,7 @@ export default {
             this.details[i].quantity = 1;
           }
 
-          if (detail.quantity > detail.purchase_quantity) {
+          if (!this.isStandalone && detail.quantity > detail.purchase_quantity) {
             this.makeToast("warning", this.$t("qty_return_is_greater_than_qty_purchased"), this.$t("Warning"));
             this.details[i].quantity = detail.quantity_copy;
           }else if(detail.quantity > detail.stock){
@@ -371,7 +852,7 @@ export default {
     increment(detail, id) {
       for (var i = 0; i < this.details.length; i++) {
         if (this.details[i].detail_id == id) {
-          if (detail.quantity + 1 > detail.purchase_quantity) {
+          if (!this.isStandalone && detail.quantity + 1 > detail.purchase_quantity) {
             this.makeToast("warning", this.$t("qty_return_is_greater_than_qty_purchased"), this.$t("Warning"));
           }else if(detail.quantity + 1 > detail.stock){
             this.makeToast("warning", this.$t("qty_return_is_greater_than_Quantity_Remaining"), this.$t("Warning"));
@@ -391,7 +872,7 @@ export default {
         if (this.details[i].detail_id == id) {
           if (detail.quantity - 1 > 0) {
              if (detail.quantity - 1 > 0) {
-            if (detail.quantity - 1 > detail.purchase_quantity) {
+            if (!this.isStandalone && detail.quantity - 1 > detail.purchase_quantity) {
             this.makeToast("warning", this.$t("qty_return_is_greater_than_qty_purchased"), this.$t("Warning"));
           }else if(detail.quantity - 1 > detail.stock){
             this.makeToast("warning", this.$t("qty_return_is_greater_than_Quantity_Remaining"), this.$t("Warning"));
@@ -501,13 +982,14 @@ export default {
       } else {
         var count = 0;
         for (var i = 0; i < this.details.length; i++) {
-          if (
-            this.details[i].quantity != "" ||
-            this.details[i].quantity !== 0
-          ) {
+          var qty = parseFloat(this.details[i].quantity);
+          if (!isNaN(qty) && qty > 0) {
             count += 1;
+          } else if (this.isStandalone) {
+            // Standalone return: every line needs a quantity (like the create form)
+            this.makeToast("warning", this.$t("AddQuantity"), this.$t("Warning"));
+            return false;
           }
-         
         }
 
         if (count === 0) {
@@ -532,7 +1014,6 @@ export default {
             date: this.purchase_return.date,
             supplier_id: this.purchase_return.supplier_id,
             warehouse_id: this.purchase_return.warehouse_id,
-            purchase_id: this.purchase_return.purchase_id,
             statut: this.purchase_return.statut,
             notes: this.purchase_return.notes,
             tax_rate: this.purchase_return.tax_rate?this.purchase_return.tax_rate:0,
@@ -540,7 +1021,7 @@ export default {
             discount: this.purchase_return.discount?this.purchase_return.discount:0,
             shipping: this.purchase_return.shipping?this.purchase_return.shipping:0,
             GrandTotal: this.GrandTotal,
-            details: this.details
+            details: this.details.map(d => Object.assign({}, d, { id: d.id || 0 }))
           })
           .then(response => {
             NProgress.done();
@@ -571,10 +1052,16 @@ export default {
         .then(response => {
           this.purchase_return = response.data.purchase_return;
           this.details = response.data.details;
+          this.suppliers = response.data.suppliers || [];
+          this.warehouses = response.data.warehouses || [];
+          if (this.isStandalone && this.purchase_return.warehouse_id) {
+            this.Get_Products_By_Warehouse(this.purchase_return.warehouse_id);
+          }
           this.Calcul_Total();
           this.isLoading = false;
         })
         .catch(response => {
+          this.makeToast("danger", this.$t("InvalidData"), this.$t("Failed"));
           setTimeout(() => {
             this.isLoading = false;
           }, 500);

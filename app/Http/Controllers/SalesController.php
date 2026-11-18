@@ -601,7 +601,13 @@ class SalesController extends BaseController
                     }
                 }
 
-                $due = $request['GrandTotal'] - $current_Sale->paid_amount;
+                // If the new GrandTotal is less than what was already paid, cap paid_amount
+                $paid_amount = $current_Sale->paid_amount;
+                if ($paid_amount > $request['GrandTotal']) {
+                    $paid_amount = $request['GrandTotal'];
+                }
+
+                $due = $request['GrandTotal'] - $paid_amount;
                 if ($due === 0.0 || $due < 0.0) {
                     $payment_statut = 'paid';
                 } else if ($due != $request['GrandTotal']) {
@@ -621,6 +627,7 @@ class SalesController extends BaseController
                     'discount'     => $request['discount'],
                     'shipping'     => $request['shipping'],
                     'GrandTotal'   => $request['GrandTotal'],
+                    'paid_amount'  => $paid_amount,
                     'payment_statut' => $payment_statut,
                 ]);
             }
@@ -935,6 +942,12 @@ class SalesController extends BaseController
         $sale_details['total_credit'] = number_format($total_credit, 2, '.', '');
         $sale_details['payment_status'] = $sale_data->payment_statut;
         $sale_details['total_in_words'] = $total_in_words;
+        // Same amount in words for each UI language (page follows the user's language)
+        $sale_details['total_in_words_i18n'] = [
+            'ar' => $total_in_words,
+            'fr' => $this->spellAmount($sale_data->GrandTotal, 'fr') ?: $total_in_words,
+            'en' => $this->spellAmount($sale_data->GrandTotal, 'en') ?: $total_in_words,
+        ];
 
         if (SaleReturn::where('sale_id', $id)->where('deleted_at', '=', null)->exists()) {
             $sellReturn = SaleReturn::where('sale_id', $id)->where('deleted_at', '=', null)->first();
@@ -1011,6 +1024,106 @@ class SalesController extends BaseController
             'company' => $company,
         ]);
 
+    }
+
+    //-------------- Profit of a sale (per product + total) ---------------\\
+    // Cost = current cost of the product in the sale's warehouse (product_warehouse.cost),
+    // falling back to the variant / product cost, converted to the unit the product was sold in.
+
+    public function Sale_Profit(Request $request, $id)
+    {
+        // own permission "Sales_profit" (Owner and Admin roles by default)
+        $this->authorizeForUser($request->user('api'), 'Sales_profit', Sale::class);
+
+        $sale = Sale::with('details.product.unitSale', 'details.product.unit')
+            ->where('deleted_at', '=', null)
+            ->findOrFail($id);
+
+        $role = Auth::user()->roles()->first();
+        $view_records = Role::findOrFail($role->id)->inRole('record_view');
+        if (!$view_records) {
+            $this->authorizeForUser($request->user('api'), 'check_record', $sale);
+        }
+
+        $lines = [];
+        $total_sales = 0;
+        $total_cost = 0;
+
+        foreach ($sale['details'] as $detail) {
+            $product = $detail['product'];
+
+            // Unit the line was sold in (fallback: product's sale unit)
+            $unit = $detail->sale_unit_id ? Unit::find($detail->sale_unit_id) : ($product ? $product['unitSale'] : null);
+
+            // Cost per base unit: warehouse cost first, then variant / product cost
+            $pw = product_warehouse::where('deleted_at', '=', null)
+                ->where('warehouse_id', $sale->warehouse_id)
+                ->where('product_id', $detail->product_id)
+                ->where('product_variant_id', $detail->product_variant_id)
+                ->first();
+
+            $base_cost = ($pw && $pw->cost > 0) ? $pw->cost : null;
+            if ($base_cost === null && $detail->product_variant_id) {
+                $variant = ProductVariant::find($detail->product_variant_id);
+                $base_cost = $variant && $variant->cost > 0 ? $variant->cost : null;
+            }
+            if ($base_cost === null) {
+                $base_cost = $product ? (float) $product->cost : 0;
+            }
+
+            // Convert to the sale unit (e.g. a box of 10 costs 10 x base cost)
+            $unit_cost = $base_cost;
+            if ($unit && $unit->operator_value) {
+                $unit_cost = $unit->operator == '/' ? $base_cost / $unit->operator_value : $base_cost * $unit->operator_value;
+            }
+
+            $line_cost = $unit_cost * $detail->quantity;
+            $line_total = (float) $detail->total;
+            $line_profit = $line_total - $line_cost;
+
+            if ($detail->product_variant_id) {
+                $variant = $variant ?? ProductVariant::find($detail->product_variant_id);
+                $name = '[' . optional($variant)->name . ']' . optional($product)->name;
+                $code = optional($variant)->code;
+            } else {
+                $name = optional($product)->name;
+                $code = optional($product)->code;
+            }
+            unset($variant);
+
+            $lines[] = [
+                'code' => $code,
+                'name' => $name,
+                'quantity' => (float) $detail->quantity,
+                'unit' => $unit ? $unit->ShortName : '',
+                'unit_price' => round($detail->quantity ? $line_total / $detail->quantity : 0, 2),
+                'unit_cost' => round($unit_cost, 2),
+                'total' => round($line_total, 2),
+                'cost' => round($line_cost, 2),
+                'profit' => round($line_profit, 2),
+                'margin' => $line_total > 0 ? round($line_profit / $line_total * 100, 1) : 0,
+            ];
+
+            $total_sales += $line_total;
+            $total_cost += $line_cost;
+        }
+
+        $gross_profit = $total_sales - $total_cost;
+        // The order discount is a loss of profit; tax and shipping are not profit
+        $order_discount = (float) $sale->discount;
+        $net_profit = $gross_profit - $order_discount;
+
+        return response()->json([
+            'lines' => $lines,
+            'summary' => [
+                'total_sales' => round($total_sales, 2),
+                'total_cost' => round($total_cost, 2),
+                'gross_profit' => round($gross_profit, 2),
+                'order_discount' => round($order_discount, 2),
+                'net_profit' => round($net_profit, 2),
+                'margin' => $total_sales > 0 ? round($net_profit / ($total_sales - $order_discount ?: 1) * 100, 1) : 0,
+            ],
+        ]);
     }
 
     //-------------- Print Invoice ---------------\\
@@ -1973,6 +2086,34 @@ class SalesController extends BaseController
  
          
      }
+
+    /**
+     * Amount in words in French or English (dirhams + centimes). Needs the PHP intl extension;
+     * returns null without it so the caller can fall back to the Arabic text.
+     */
+    private function spellAmount($amount, $locale)
+    {
+        if (!class_exists('NumberFormatter')) {
+            return null;
+        }
+
+        $amount = round((float) $amount, 2);
+        $integer = (int) floor($amount);
+        $cents = (int) round(($amount - $integer) * 100);
+
+        $formatter = new \NumberFormatter($locale, \NumberFormatter::SPELLOUT);
+        $words = [
+            'fr' => ['dirham', 'dirhams', 'centime', 'centimes', 'et'],
+            'en' => ['dirham', 'dirhams', 'centime', 'centimes', 'and'],
+        ][$locale];
+
+        $text = $formatter->format($integer) . ' ' . ($integer > 1 ? $words[1] : $words[0]);
+        if ($cents > 0) {
+            $text .= ' ' . $words[4] . ' ' . $formatter->format($cents) . ' ' . ($cents > 1 ? $words[3] : $words[2]);
+        }
+
+        return $text;
+    }
 
     /**
      * Convert a number to its text representation in Arabic

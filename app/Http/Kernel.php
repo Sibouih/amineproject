@@ -52,6 +52,8 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \Laravel\Passport\Http\Middleware\CreateFreshApiToken::class,
+            // HTML pages are never cached: a deploy is picked up without clearing the browser cache
+            \App\Http\Middleware\NoCacheHtml::class,
 
         ],
 
@@ -86,5 +88,6 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'Is_Active' => \App\Http\Middleware\Is_Active::class,
+        'Pos_Only' => \App\Http\Middleware\Pos_Only::class,
     ];
 }

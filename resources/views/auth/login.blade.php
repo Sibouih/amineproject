@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <link rel=icon href=/images/favicon.ico>
-    <link rel="stylesheet" href="/css/master.css">
+    <link rel="stylesheet" href="/css/master.css?v={{ @filemtime(public_path('css/master.css')) ?: '4.0.7' }}">
 
     <title>Dashboard</title>
   </head>
@@ -39,7 +39,7 @@
         };
       </script>
 
-      <script src="/js/login.min.js?v=4.0.7"></script>
+      <script src="/js/login.min.js?v={{ @filemtime(public_path('js/login.min.js')) ?: '4.0.7' }}"></script>
   </body>
 </html>
 
